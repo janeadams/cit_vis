@@ -7,3 +7,5 @@
 .pyc
 ._DS_Store
 .html
+data/
+*/__pycache__/
