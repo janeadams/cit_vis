@@ -2,12 +2,13 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+import os
+from dash import dcc
+from dash import html
 from dash.dependencies import Input, Output
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from cit_vis.parse import get_assay_scores, get_genus_abundances, group_by_nodes, get_relevant_assays, get_mice, create_matrix
+from cit_vis.parse import get_assay_scores, get_genus_abundances, group_by_nodes, get_relevant_assays
 
 def create_color_scale(df):
     min_val = min(df['Assay'])
@@ -86,31 +87,91 @@ def create_stripplot(df, color_scale):
     fig.update_traces(hovertemplate='Mouse ID: %{x}<br>Assay: %{y}')
     return fig
 
-def create_grid_plot(assay, node_id, genus):
-    mice = get_mice(assay, node_id)
-    df = get_genus_abundances()
-    df['group'] = [node_id if x else 'other' for x in df.index.isin(mice)]
-    # Create a histogram with the genus abundance
-    fig = px.histogram(df, x=genus, color='group', color_discrete_sequence=['lightgrey', 'blue'], nbins=20, histnorm='probability density', barmode='overlay', title=f'{genus} abundance in node {node_id}')
-    # Add a vertical line to show the mean value
-    fig.add_vline(x=df[genus].mean(), line_dash="dash", line_color="black")
-    fig.update_layout(template='plotly_white', width=400, height=400)
+def get_subset(row, current_bug):
+    rules = row['path']
+    subset = pd.read_csv('data/genus_abundances.csv')
+    rules = rules.split(' & ')
+    for rule in rules:
+        bug, sign, val = rule.split(' ')
+        if current_bug != bug:
+            if sign == '<=':
+                subset = subset[subset[bug] <= float(val)]
+            elif sign == '>':
+                subset = subset[subset[bug] > float(val)]
+    print(subset.head())
+    print(subset.shape)
+    print()
+    return subset
+
+def make_charts(assay):
+    """
+    Adjust this function to fit your new data structure and requirements.
+
+    Parameters:
+    - assay: The assay to analyze.
+
+    Returns:
+    - depths: Dictionary mapping depths to charts.
+    """
+    A_DF = pd.read_csv('data/assay_scores.csv').reset_index().rename(columns={'index': 'Mouse_ID'})
+    split_df = pd.read_csv(f'data/{assay}/tree_summary.csv')
+    # Ensure output directories exist
+    os.makedirs(f'output/{assay}', exist_ok=True)
+    
+    # Create assay lookup and prepare split_df
+    assay_lookup = dict(zip(A_DF['Mouse_ID'], A_DF[assay]))
+    split_df['depth'] = [len(str(s).split(' ')) for s in split_df['path']]
+    split_df['depth'] = split_df['depth'].rank(method='dense')
+    
+    # Filter for leaf nodes
+    leaf_df = split_df[split_df['is_leaf'] == True]
+    
+    # Initialize tracking variables
+    seen_bugs = {'root': 0}
+    depths = {l: [] for l in set(split_df['depth'].values)}
+    
+    # Loop through the DataFrame rows
+    for index, row in split_df.iterrows():
+        g = row['genus']  # Adjust for new column name if changed
+        v = row['split_value']  # Adjust if the format or logic has changed
+        
+        compute = False
+        # Check if you need to update the computation logic based on new data
+        if g not in seen_bugs or (g != 'root' and seen_bugs[g] != v):
+            compute = True
+        
+        if compute:
+            # Update how you slice your data if necessary
+            subset = get_subset(row, g)
+            subset[assay] = [assay_lookup[m] for m in slice['Mouse_ID']]
+            subset['group'] = slice[g].apply(lambda x: 'below' if x < v else 'above')
+            
+            # Create your plotly chart here (adjust as needed)
+            fig = create_plotly_chart(slice, g, v, assay, get_color)
+            
+            # Save the chart and update depths dictionary
+            fig.write_image(f"output/{assay}/{row['node']}_{g}.svg")
+    
+    return depths
+
+def create_plotly_chart(slice, g, v, assay, get_color):
+    """
+    Create and return a Plotly chart based on the given parameters.
+    Adjust the function parameters and logic as needed.
+    """
+    # Placeholder function for creating a plotly chart
+    # Replace this with your actual chart creation logic
+    fig = px.histogram(slice, x=g)
+    # Customize fig as needed
     return fig
 
-def grid_handler(df, assay):
-    matrix = create_matrix(df, assay)
-    plot_grid = [html.Div(f'{node}') for node in matrix.index]
-    for genus in matrix.columns:
-        row_items = [html.Div(f'{genus}')]
-        for node in matrix.index:
-            if matrix.loc[node, genus] == 0:
-                row_items.append(html.Div(style={'width': '400px', 'height': '400px'}))
-            else:
-                row_items.append(html.Div([dcc.Graph(figure=create_grid_plot(assay, node, genus))]))
-        row_items = html.Div(row_items, style={'display': 'flex', 'flex-direction': 'row', 'flex-wrap': 'wrap'})
-        plot_grid.append(row_items)
-    plot_grid = html.Div(plot_grid, style={'display': 'flex', 'flex-direction': 'column'})
-    return plot_grid
+def make_grid(assay):
+    content = []
+    depths = make_charts(assay)
+    for depth, figs in depths.items():
+        figs = [f for f in figs if f is not None]
+        content.append(html.Div(figs, style={'margin': '0 auto', 'background-color': '#666'}))
+    return content
 
 def make_dashboard():
     assay_df = get_assay_scores()
@@ -120,78 +181,64 @@ def make_dashboard():
     genera_dropdown_options = [{'label': genus, 'value': genus} for genus in genera]
     genera_dropdown_options.insert(0, {'label': 'All', 'value': 'All'})
 
-    # Things that update when the genus changes
     selected_genus = 'All'
     assay_dropdown_options = [{'label': assay, 'value': assay} for assay in assays]
     selected_assay = assays[0]
 
-    # Things that update when the assay changes
     df = get_assay_scores(selected_assay)
     color_scale = create_color_scale(df)
 
+    grid = make_grid(selected_assay)
+
     app = dash.Dash(__name__)
     
-    # Define the layout
     app.layout = html.Div([
         html.H1("CIT Visualization"),
         html.Div([
-            html.Div([
-                dcc.Dropdown(
-                    id='genus-dropdown',
-                    options=genera_dropdown_options,
-                    value=selected_genus
-                )
-            ]),
-            html.Div([
-                dcc.Dropdown(
-                    id='assay-dropdown',
-                    options=assay_dropdown_options,
-                    value=selected_assay
-                )
-            ]),
-        ]),
+            dcc.Dropdown(
+                id='genus-dropdown',
+                options=genera_dropdown_options,
+                value=selected_genus
+            ),
+            dcc.Dropdown(
+                id='assay-dropdown',
+                options=assay_dropdown_options,
+                value=selected_assay
+            )
+        ], style={'display': 'flex', 'width': '100%'}),
         html.Div([
-            html.Div([
-                dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(df, color_scale))
-            ], style={'width': '49%', 'display': 'inline-block'}),
-            html.Div([
-                dcc.Graph(id='stripplot', figure=create_stripplot(df, color_scale))
-            ], style={'width': '49%', 'display': 'inline-block'})
-        ]),
-        html.Div(id='grid-container', children=grid_handler(df, selected_assay), style={'width': '100%'}),
+            dcc.Graph(id='sankey-diagram'),
+            dcc.Graph(id='stripplot')
+        ], style={'display': 'flex', 'width': '100%'}),
+        html.Div(dcc.Graph(id='grid', figure=grid)),
         dcc.Store(id='selected-assay', data=selected_assay)
     ])
 
     @app.callback(
         [Output('assay-dropdown', 'options'),
          Output('assay-dropdown', 'value')],
-        [Input('genus-dropdown', 'value'),
-         Input('selected-assay', 'data')]
+        [Input('genus-dropdown', 'value')]
     )
-    def update_assay_dropdown(selected_genus, selected_assay):
+    def update_assay_dropdown(selected_genus):
         if selected_genus == 'All':
-            return [{'label': assay, 'value': assay} for assay in assays], selected_assay
+            options = [{'label': assay, 'value': assay} for assay in assays]
+            return options, assays[0]
         relevant_assays = get_relevant_assays(selected_genus)
-        if selected_assay not in relevant_assays:
-            selected_assay = relevant_assays[0]
-        return [{'label': assay, 'value': assay} for assay in relevant_assays], selected_assay
+        options = [{'label': assay, 'value': assay} for assay in relevant_assays]
+        return options, relevant_assays[0] if relevant_assays else assays[0]
 
     @app.callback(
         [Output('sankey-diagram', 'figure'),
-         Output('stripplot', 'figure')],
+         Output('stripplot', 'figure'),
+         Output('grid', 'figure')],
         [Input('assay-dropdown', 'value')]
     )
-    def update_sankey_diagram(selected_assay):
+    def update_figures(selected_assay):
         df = get_assay_scores(selected_assay)
         color_scale = create_color_scale(df)
-        return create_sankey_diagram(df, color_scale), create_stripplot(df, color_scale)
+        sankey_fig = create_sankey_diagram(df, color_scale)
+        stripplot_fig = create_stripplot(df, color_scale)
+        grid = make_grid(selected_assay)
+        return sankey_fig, stripplot_fig, grid
 
-    @app.callback(
-        Output('grid-container', 'children'),
-        [Input('assay-dropdown', 'value')]
-    )
-    def update_grid(selected_assay):
-        df = get_assay_scores(selected_assay)
-        return grid_handler(df, selected_assay)
-
-    app.run_server(debug=True)
+    app.run_server(debug=True, use_reloader=False)

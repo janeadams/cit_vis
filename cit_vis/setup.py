@@ -115,11 +115,12 @@ def make_data():
             if "Genus_" in line:
                 # Use regular expression to extract the genus ID
                 genus = re.findall(r'Genus_\d+', line)[0]
-                if genus not in genera:
-                    genera.append(genus)
+                genera.append(genus)
 
         # Store relevant genera:
-        relevant_genera[assay] = genera
+        relevant_genera[assay] = list(set(genera))
+
+        parse_tree(tree_rules, genus_abundances_df).to_csv(f"data/{assay}/tree_summary.csv")
 
         # Store relevant assays:
         for genus in genera:
@@ -133,6 +134,60 @@ def make_data():
 
     with open("data/relevant_assays.json", "w") as json_file:
         json.dump(relevant_assays, json_file)
+
+def parse_tree(tree_text, genus_abundances_df):
+    tree_lines = tree_text.strip().split("\n")
+    nodes = []
+    depth_dict = {0: (genus_abundances_df, '')}  # Initialize with root level dataframe and empty path
+
+    for line in tree_lines:
+        depth = line.count("|")
+        parts = line.strip().split()
+        parts = [part for part in parts if "|" not in part]
+
+        if len(parts) == 0:  # Skip empty lines
+            continue
+
+        # Revert curr_mice and path to the state of its parent node
+        curr_mice, path = depth_dict[depth - 1]
+
+        if parts[0] == "class:":
+            feature = f"Node_{len(nodes) + 1}"
+            split_type = None
+            split_value = None
+            is_leaf = True
+        else:
+            feature = parts[0]
+            split_type = parts[1]
+            split_value = parts[2]
+            is_leaf = False
+            # Apply filter based on split_type
+            if split_type == "<=":
+                curr_mice = curr_mice[curr_mice[feature] <= float(split_value)]
+            else:
+                curr_mice = curr_mice[curr_mice[feature] > float(split_value)]
+
+            # Updating the path
+            new_rule = f"{feature} {split_type} {split_value}"
+            path = f"{path} & {new_rule}" if path else new_rule
+
+        nodes.append({
+            "depth": depth,
+            "genus": feature,
+            "split_type": split_type,
+            "split_value": split_value,
+            "rule": None if is_leaf else "".join(parts),
+            "is_leaf": is_leaf,
+            "mice": curr_mice.index.tolist(),
+            "path": path,  # Add the accumulated path
+        })
+        
+        # Update the depth dictionary with the new state of curr_mice and path
+        depth_dict[depth] = (curr_mice, path)
+    
+    return pd.DataFrame(nodes)
+
+
 
 if __name__ == "__main__":
     make_data()

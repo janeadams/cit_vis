@@ -13,12 +13,6 @@ def get_assay_scores(assay=None):
     return pd.read_csv('data/assay_scores.csv', index_col=0)
 
 def group_by_nodes(df, assay=None):
-    if assay:
-        # See if it's cached:
-        try:
-            return pd.read_csv(f"data/{assay}/nodes.csv", index_col=0)
-        except FileNotFoundError:
-            pass
     node_summary = df.groupby('Node_ID').agg({
         'Assay': ['mean', 'count'],
         'Path': 'first'
@@ -28,9 +22,20 @@ def group_by_nodes(df, assay=None):
     return node_summary
 
 def create_matrix(df, assay):
-    node_summary = group_by_nodes(df)
-    node_genus_matrix = node_summary.explode('Path').reset_index().pivot_table(index='Node_ID', columns='Path', values='Count', fill_value=0)
-    node_genus_matrix.columns = [col.split('>')[-2] for col in node_genus_matrix.columns]
+    # Assuming group_by_nodes is applied before this function
+    node_summary = df.copy()
+    
+    # Split 'Path' into individual genuses and explode into new rows
+    node_summary['Path'] = node_summary['Path'].apply(lambda x: x.split('>'))
+    node_genus_pairs = node_summary.explode('Path')
+    
+    # Keep only genus in 'Path' (remove 'Node_*' entries)
+    node_genus_pairs = node_genus_pairs[~node_genus_pairs['Path'].str.startswith('Node_')]
+    
+    # Create a pivot table with Node_ID as rows and genuses as columns
+    node_genus_matrix = node_genus_pairs.pivot_table(index='Node_ID', columns='Path', aggfunc='size', fill_value=0)
+    
+    # Save to CSV
     node_genus_matrix.to_csv(f"data/{assay}/matrix.csv")
     return node_genus_matrix
 
