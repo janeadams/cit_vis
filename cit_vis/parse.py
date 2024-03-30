@@ -59,14 +59,13 @@ def get_grid_structure(groups):
 def get_edgelist(groups):
     edgelist = []
     for i, group in groups.iterrows():
-        print("get_edgelist")
-        print(group)
         for i in range(len(group["Feature Path"])-1):
             source = group["Feature Path"][i]
             target = group["Feature Path"][i+1]
             value = len(group.index)
-            edgelist.append([source, target, value])
-    edgeDF = pd.DataFrame(edgelist, columns=["source", "target", "value"])
+            mean_trait = group["Mean Trait Value"]
+            edgelist.append([source, target, value, mean_trait])
+    edgeDF = pd.DataFrame(edgelist, columns=["source", "target", "value", "mean_trait"])
     return edgeDF
 
 def parse_data():
