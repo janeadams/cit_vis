@@ -72,6 +72,7 @@ def create_sankey_diagram(groups, color_scale):
             #label=sankey_df['edge_label']
         )
     )])
+    fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
 def create_stripplot(df, trait, color_scale):
@@ -80,11 +81,12 @@ def create_stripplot(df, trait, color_scale):
     df['color'] = [get_color(t, color_scale) for t in df[trait]]
     color_lookup = dict(zip(df['Group ID'], df['color']))
     fig = px.strip(df, x='Group ID', y=trait, color='Group ID', color_discrete_map=color_lookup)
-    fig.update_layout(template='plotly_white', showlegend=False, title='Trait scores by group')
+    fig.update_layout(template='plotly_white', showlegend=False)
     # Add a dark gray stroke to the strip plot points:
     fig.update_traces(marker=dict(size=8, line=dict(width=2, color='DarkSlateGray')))
     # On hover, show the mouse ID and the trait score
     fig.update_traces(hovertemplate='Mouse ID: %{x}<br>Trait: %{y}')
+    fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
 def create_empty_plot():
@@ -208,21 +210,48 @@ def make_dashboard():
     groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df)
 
     app = Dash(__name__)
-    
-    # Define the layout
+
+    # Adjusted styles with flex wrap
+    row_style = {
+        'display': 'flex',
+        'width': '100%',
+        'justifyContent': 'space-between',
+        'alignItems': 'center',
+        'flexWrap': 'wrap',  # Allow items to wrap
+        'marginBottom': '20px'  # Add some space between rows for clarity
+    }
+    dropdown_cell_style = {
+        'padding': '10px',  # Ensure padding has units
+        'flexBasis': 'calc(50% - 20px)',  # Calculate width considering padding/margin
+        'boxSizing': 'border-box'  # Include padding in the element's total width
+    }
+    overview_cell_style = dropdown_cell_style.copy()
+    overview_cell_style.update({
+        'height': '200px'
+    })
+
+    # Define the layout with improved structure and styling
     app.layout = html.Div([
         html.H1("CIT Visualization"),
-        html.Div([html.Div([dcc.Dropdown(id='microbe-dropdown',options=make_microbes_dropdown_options(microbes),value=selected_microbe)]),html.Div([dcc.Dropdown(id='trait-dropdown',options=make_traits_dropdown_options(traits),value=selected_trait)]),]),
-        html.Div([html.Div([
-                dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(groups, color_scale))
-            ], style={'width': '49%', 'display': 'inline-block'}),
-            html.Div([
-                dcc.Graph(id='stripplot', figure=create_stripplot(df, selected_trait, color_scale))
-            ], style={'width': '49%', 'display': 'inline-block'})
-        ]),
-        html.Div(id='grid-container', children=grid_handler(grid, df), style={'width': '100%'}),
+        html.Div([
+            html.Div([dcc.Dropdown(id='microbe-dropdown', options=make_microbes_dropdown_options(microbes), value=selected_microbe)],
+                    style=dropdown_cell_style),
+            html.Div([dcc.Dropdown(id='trait-dropdown', options=make_traits_dropdown_options(traits), value=selected_trait)],
+                    style=dropdown_cell_style),
+        ], style=row_style),
+
+        html.Div([
+            html.Div([dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(groups, color_scale), config={'displayModeBar': False})],
+                    style=overview_cell_style),
+            html.Div([dcc.Graph(id='stripplot', figure=create_stripplot(df, selected_trait, color_scale), config={'displayModeBar': False})],
+                    style=overview_cell_style)
+        ], style=row_style),
+        
+        html.Div(id='grid-container', children=grid_handler(grid, df), style=row_style),
         dcc.Store(id='selected-trait', data=selected_trait)
     ], style={'width': '100%', 'margin': 'auto', 'padding': '20px', 'min-width': '1200px', 'font-family': 'Arial, sans-serif', 'color': '#333', 'background-color': '#ffffff'})
+
+
     @app.callback(
         [Output('trait-dropdown', 'options'),
          Output('trait-dropdown', 'value')],
