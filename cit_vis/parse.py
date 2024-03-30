@@ -60,10 +60,10 @@ def parse_data():
     data_dir = os.getenv("DATA_DIR")
     folders = get_trait_folders(data_dir)
     microbes = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
-    for trait in folders:
-        rules = parse_rules(trait, data_dir)
-        levels = apply_rules(rules, microbes, data_dir, trait)
-    return levels
+    # for trait in folders:
+        #rules = parse_rules(trait, data_dir)
+        #levels = apply_rules(rules, microbes, data_dir, trait)
+    return
 
 if __name__ == "__main__":
     parse_data()

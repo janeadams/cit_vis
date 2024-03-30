@@ -65,7 +65,6 @@ def make_data():
 
     # Decision Tree Classifier to analyze categorical trait scores
     for trait in trait_scores_df.columns:
-        print(trait)
         os.makedirs(os.path.join(data_dir, trait), exist_ok=True)
         X = microbe_abundances_df
         y = trait_scores_df[trait]
@@ -79,14 +78,11 @@ def make_data():
         # Apply the model to get predictions
         predictions = clf.predict(X)
 
-
-
         # Create and save a DataFrame with predictions
         results_df = pd.DataFrame({
             'Mouse ID': X.index,
             trait: original_trait_scores_df[trait][X.index],  # Real trait scores
             'Group ID': [f'Group{n}' for n in clf.apply(X)],  # Group where the prediction was made
-            'Paths': ""
         })
         results_df.to_csv(os.path.join(data_dir, trait, "groups.csv"), index=False)
 
