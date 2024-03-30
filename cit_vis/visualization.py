@@ -1,3 +1,5 @@
+import os
+import dotenv
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -5,7 +7,16 @@ from dash import Dash, html, dcc
 from dash.dependencies import Input, Output
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from cit_vis.parse import get_trait_scores, get_microbe_abundances, group_by_groups, get_relevant_traits, get_mice, create_matrix
+from cit_vis.parse import aggregate_by_group, get_grid_structure, get_edgelist
+
+def load_data(trait, data_dir, df):
+    groups = pd.read_pickle(os.path.join(data_dir, trait, "groups.pkl"))
+    color_scale = create_color_scale(df[trait])
+    grid = pd.read_pickle(os.path.join(data_dir, trait, "grid.pkl"))
+    mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"), index_col=0).filter(["Group ID"], axis=1)
+    group_ids = [mice.loc[mouse_id, 'Group ID'] for mouse_id in df.index]
+    return groups, grid, color_scale, group_ids
+
 
 def create_color_scale(vector):
     min_val = min(vector)
@@ -23,60 +34,31 @@ def get_color(value, color_scale):
     # Convert RGBA to hexadecimal
     return mcolors.to_hex(rgba_color)
 
-def get_mean_value(df, group):
-    group_df = group_by_groups(df)
-    mean_val = group_df.loc[group]['Mean']
-    return mean_val
-
-def create_sankey_df(df):
-    sankey_df = pd.DataFrame(columns=['source', 'target', 'value'])
-    for i, row in df.iterrows():
-        path = row['Path'].split('>')
-        for i in range(len(path) - 1):
-            source = path[i]
-            target = path[i + 1]
-            if source not in sankey_df['source'].values:
-                sankey_df = pd.concat([sankey_df, pd.DataFrame({'source': source, 'target': target, 'value': [1]})])
-            else:
-                if target in sankey_df[sankey_df['source'] == source]['target'].values:
-                    sankey_df.loc[(sankey_df['source'] == source) & (sankey_df['target'] == target), 'value'] += 1
-                else:
-                    sankey_df = pd.concat([sankey_df, pd.DataFrame({'source': source, 'target': target, 'value': [1]})])
-    # Create informative labels for the groups
-    sankey_df['edge_label'] = sankey_df['source'] + ' to ' + sankey_df['target']
-    return sankey_df
-
-def create_sankey_diagram(df, color_scale):
-    sankey_df = create_sankey_df(df)
+def create_sankey_diagram(groups, color_scale):
+    sankey_df = get_edgelist(groups)
+    print('sankey_df')
+    print(sankey_df)
     labels = list(set(sankey_df['source'].values) | set(sankey_df['target'].values))
-    color = [get_color(get_mean_value(df, group), color_scale) if 'Group' in group else 'black' for group in labels]
     fig = go.Figure(data=[go.Sankey(
-        group=dict(
+        node=dict(
             pad=15,
             thickness=20,
             line=dict(color="black", width=0.5),
-            label=labels,
-            color=color
+            label=labels
         ),
         link=dict(
             source=[labels.index(x) for x in sankey_df['source']],
             target=[labels.index(x) for x in sankey_df['target']],
             value=sankey_df['value'],
-            label=sankey_df['edge_label']
+            #label=sankey_df['edge_label']
         )
     )])
     return fig
 
-def create_stripplot(df, color_scale):
-    # Sort by the mean group value
-    group_df = group_by_groups(df)
-    group_df = group_df.sort_values(by='Mean')
-    group_order = group_df.index
-    df = df.set_index('Group ID').loc[group_order].reset_index()
-    # Assign a color to each group group
-    df['color'] = [get_color(value, color_scale) for value in df['Trait']]
-    color_lookup = dict(zip(df['Group ID'], df['color']))
-    fig = px.strip(df, x='Group ID', y='Trait', color='Group ID', color_discrete_map=color_lookup)
+def create_stripplot(df, trait, color_scale):
+    # Assign a color to each group
+    df['color'] = [get_color(t, color_scale) for t in df[trait]]
+    fig = px.strip(df, x='Group ID', y=trait, color='color')
     fig.update_layout(template='plotly_white', showlegend=False, title='Trait scores by group')
     # Add a dark gray stroke to the strip plot points:
     fig.update_traces(marker=dict(size=8, line=dict(width=2, color='DarkSlateGray')))
@@ -84,36 +66,37 @@ def create_stripplot(df, color_scale):
     fig.update_traces(hovertemplate='Mouse ID: %{x}<br>Trait: %{y}')
     return fig
 
-def create_grid_plot(trait, group, microbe):
-    mice = get_mice(trait, group)
-    df = get_microbe_abundances()
-    df['group'] = [group if x else 'other' for x in df.index.isin(mice)]
-    # Create a histogram with the microbe abundance
-    fig = px.histogram(df, x=microbe, color='group', color_discrete_sequence=['lightgrey', 'blue'], nbins=20, histnorm='probability density', barmode='overlay', title=f'{microbe} abundance in group {group}')
+def create_grid_plot(feature, df):
+    fig = px.histogram(df, x=feature, color='Group ID', color_discrete_sequence=['lightgrey', 'blue'], nbins=20, histnorm='probability density', barmode='overlay', title=f'{feature} abundance')
     # Add a vertical line to show the mean value
-    fig.add_vline(x=df[microbe].mean(), line_dash="dash", line_color="black")
+    fig.add_vline(x=df[feature].mean(), line_dash="dash", line_color="black")
     fig.update_layout(template='plotly_white', width=400, height=400)
     return fig
 
-def grid_handler(df, trait):
-    #matrix = create_matrix(df, trait)
-    grid_data = []
-    for microbe in matrix.columns:
-        row_items = [html.Div(f'{microbe}')]
-        for group in matrix.index:
-            if matrix.loc[group, microbe] == 0:
+def grid_handler(grid, df):
+    grid_dict = grid.to_dict(orient='index')
+    plot_grid = []
+    for col, cells in grid_dict.items():
+        row_items = []
+        for group, celldata in cells.items():
+            if celldata['Type'] == 'Arrow':
                 row_items.append(html.Div(style={'width': '400px', 'height': '400px'}))
             else:
-                row_items.append(html.Div([dcc.Graph(figure=create_grid_plot(trait, group, microbe))]))
+                subset = df.loc[celldata['Mouse IDs']]
+                row_items.append(html.Div([dcc.Graph(figure=create_grid_plot(celldata['Feature'], subset))]))
         row_items = html.Div(row_items, style={'display': 'flex', 'flex-direction': 'row', 'flex-wrap': 'wrap'})
         plot_grid.append(row_items)
     plot_grid = html.Div(plot_grid, style={'display': 'flex', 'flex-direction': 'column'})
     return plot_grid
 
+
+
 def make_dashboard():
-    trait_df = get_trait_scores()
+    dotenv.load_dotenv()
+    data_dir = os.getenv("DATA_DIR")
+    trait_df = pd.read_csv(os.path.join(data_dir, "trait_scores.csv"), index_col=0)
     traits = trait_df.columns
-    microbe_df = get_microbe_abundances()
+    microbe_df = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
     microbes = microbe_df.columns
     microbes_dropdown_options = [{'label': microbe, 'value': microbe} for microbe in microbes]
     microbes_dropdown_options.insert(0, {'label': 'All', 'value': 'All'})
@@ -125,7 +108,7 @@ def make_dashboard():
     selected_trait = traits[0]
 
     # Things that update when the trait changes
-    color_scale = create_color_scale(df[selected_trait])
+    groups, grid, color_scale, df['Group ID'] = load_data(selected_trait, data_dir, df)
 
     app = Dash(__name__)
     
@@ -150,16 +133,15 @@ def make_dashboard():
         ]),
         html.Div([
             html.Div([
-                dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(df, color_scale))
+                dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(groups, color_scale))
             ], style={'width': '49%', 'display': 'inline-block'}),
             html.Div([
-                dcc.Graph(id='stripplot', figure=create_stripplot(df, color_scale))
+                dcc.Graph(id='stripplot', figure=create_stripplot(df, selected_trait, color_scale))
             ], style={'width': '49%', 'display': 'inline-block'})
         ]),
-        html.Div(id='grid-container', children=grid_handler(df, selected_trait), style={'width': '100%'}),
+        html.Div(id='grid-container', children=grid_handler(grid, df), style={'width': '100%'}),
         dcc.Store(id='selected-trait', data=selected_trait)
     ])
-
     @app.callback(
         [Output('trait-dropdown', 'options'),
          Output('trait-dropdown', 'value')],
@@ -169,25 +151,25 @@ def make_dashboard():
     def update_trait_dropdown(selected_microbe, selected_trait):
         if selected_microbe == 'All':
             return [{'label': trait, 'value': trait} for trait in traits], selected_trait
-        relevant_traits = get_relevant_traits(selected_microbe)
+        relevant_traits = traits#get_relevant_traits(selected_microbe)
         if selected_trait not in relevant_traits:
             selected_trait = relevant_traits[0]
         return [{'label': trait, 'value': trait} for trait in relevant_traits], selected_trait
-
+    
     @app.callback(
         [Output('sankey-diagram', 'figure'),
-         Output('stripplot', 'figure')],
+         Output('stripplot', 'figure'),
+         Output('grid-container', 'children')],
         [Input('trait-dropdown', 'value')]
     )
-    def update_sankey_diagram(selected_trait):
-        color_scale = create_color_scale(df[selected_trait])
-        return create_sankey_diagram(df, color_scale), create_stripplot(df, color_scale)
-
-    @app.callback(
-        Output('grid-container', 'children'),
-        [Input('trait-dropdown', 'value')]
-    )
-    def update_grid(selected_trait):
-        return grid_handler(df, selected_trait, microbes, groups)
+    def update_charts(selected_trait):
+        groups, grid, color_scale, df['Group ID'] = load_data(selected_trait, data_dir, df)
+        sankey = create_sankey_diagram(groups, color_scale)
+        stripplot = create_stripplot(df, selected_trait, color_scale)
+        grid = grid_handler(grid, df)
+        return sankey, stripplot, grid
 
     app.run_server(debug=True)
+    
+if __name__ == "__main__":
+    make_dashboard()

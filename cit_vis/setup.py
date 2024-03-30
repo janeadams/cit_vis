@@ -70,7 +70,7 @@ def make_data():
         # Splitting the dataset (optional for this operation)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        clf = DecisionTreeClassifier(random_state=42)
+        clf = DecisionTreeClassifier(random_state=42, min_samples_leaf=5, max_depth=10)
         clf.fit(X_train, y_train)
 
         # Apply the model to get predictions
