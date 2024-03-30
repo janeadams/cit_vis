@@ -2,8 +2,6 @@ import numpy as np
 import pandas as pd
 import os
 import dotenv
-import json
-import re
 from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.model_selection import train_test_split
 
@@ -82,9 +80,50 @@ def make_data():
         results_df = pd.DataFrame({
             'Mouse ID': X.index,
             trait: original_trait_scores_df[trait][X.index],  # Real trait scores
-            'Group ID': [f'Group{n}' for n in clf.apply(X)],  # Group where the prediction was made
+            'Group ID': [f'Group{n}' for n in clf.apply(X)]
         })
-        results_df.to_csv(os.path.join(data_dir, trait, "groups.csv"), index=False)
+
+        # Get the decision paths for the input samples
+        decision_paths = clf.decision_path(X)
+
+        # Convert the sparse matrix to a list of nodes for each sample
+        paths_list = []
+        for i in range(decision_paths.shape[0]):
+            # Get the indices of the nodes that the sample goes through
+            node_indices = decision_paths[i].indices
+            # Convert the indices to a string or list and append to our list
+            paths_list.append(str(node_indices))
+
+        # Get feature names from the DataFrame
+        feature_names = X.columns
+
+        # Initialize a list to store the feature names for the paths
+        feature_paths_list = []
+
+        for i in range(decision_paths.shape[0]):
+            # Get the node indices for the current sample's path
+            node_indices = decision_paths[i].indices
+            
+            # Initialize a list to store the feature names for the current path
+            path_features = []
+            
+            for node_index in node_indices:
+                # Get the feature index for the current node
+                feature_index = clf.tree_.feature[node_index]
+                
+                # Skip nodes that are leaves (indicated by feature_index == -2)
+                if feature_index != -2:
+                    # Add the feature name to the path_features list
+                    feature_name = feature_names[feature_index]
+                    path_features.append(feature_name)
+            
+            # Convert the path_features list to a string and append to feature_paths_list
+            feature_paths_list.append(' -> '.join(path_features))
+
+        # Add the feature path to the results DataFrame
+        results_df['Feature Path'] = feature_paths_list
+
+        results_df.to_csv(os.path.join(data_dir, trait, "mice.csv"), index=False)
 
         # Extract rules using export_text
         tree_rules = export_text(clf, feature_names=list(X.columns))
