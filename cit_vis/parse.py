@@ -1,138 +1,69 @@
+import os
+import dotenv
 import pandas as pd
-import json
 
-def get_assay_scores(assay=None):
-    """Load the assay scores from file
-    Args:
-        assay (str): The name of the assay
-    Returns:
-        pd.Series: The assay scores
-    """
-    if assay:
-        return pd.read_csv(f'data/{assay}/mice.csv', index_col=0)
-    return pd.read_csv('data/assay_scores.csv', index_col=0)
+def get_trait_folders(data_dir):
+    return [f for f in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, f))]
 
-def group_by_nodes(df, assay=None):
-    if assay:
-        # See if it's cached:
-        try:
-            return pd.read_csv(f"data/{assay}/nodes.csv", index_col=0)
-        except FileNotFoundError:
-            pass
-    node_summary = df.groupby('Node_ID').agg({
-        'Assay': ['mean', 'count'],
-        'Path': 'first'
-    })
-    node_summary.columns = ['Mean', 'Count', 'Path']
-    if assay: node_summary.to_csv(f"data/{assay}/nodes.csv")
-    return node_summary
+def parse_rules(trait, data_dir):
+    tree_rules = open(os.path.join(data_dir, trait, "rules.txt")).read()
+    rules_df = pd.DataFrame(columns=['Depth', 'Microbe', 'Split', 'Value', 'Parent', 'Children'])
+    last_at_depth = {0: 'Root'}
+    for i, line in enumerate(tree_rules.split("\n")):
+        depth = line.count('|')
+        elements = line.split( )[depth:]
+        if len(elements) == 3:
+            if elements[0] != 'class:':
+                microbe, split, value = elements
+                microbe = microbe+' '+split
+                parent = last_at_depth[depth-1]
+                rules_df.loc[i] = [depth, microbe, split, value, parent, []]
+        last_at_depth[depth] = microbe
+    for i, rule in rules_df.iterrows():
+        # Find the indices of the parent:
+        parent = rule['Parent']
+        parent_indices = rules_df[rules_df['Microbe'] == parent]
+        for parent_index in parent_indices.index:
+            rules_df.at[parent_index, 'Children'].append(rule['Microbe'])
+    os.makedirs(os.path.join(data_dir, trait), exist_ok=True)
+    rules_df.to_csv(os.path.join(data_dir, trait, "_rules.csv"), index=False)
+    return rules_df
 
-def create_matrix(df, assay):
-    node_summary = group_by_nodes(df)
-    node_genus_matrix = node_summary.explode('Path').reset_index().pivot_table(index='Node_ID', columns='Path', values='Count', fill_value=0)
-    node_genus_matrix.columns = [col.split('>')[-2] for col in node_genus_matrix.columns]
-    node_genus_matrix.to_csv(f"data/{assay}/matrix.csv")
-    return node_genus_matrix
+def apply_rules(rules, microbes, data_dir, trait):
+    # Convert rule rows to a list of dictionaries
+    rules_dict = rules.set_index('Microbe').to_dict(orient='index')
+    print(rules_dict)
+    
+    # Recurse through the tree to assign a list of mice to each rule:
+    def recurse_tree(rule, mice):
+        if len(rule['Children'])>0:
+            for child in rule['Children']:
+                child_rule = rules_dict[child]
+                recurse_tree(child_rule, mice)
+        else:
+            mice_in_rule = microbes[(microbes[rule['Microbe']] <= float(rule['Value'])) if rule['Split'] == '<=' else (microbes[rule['Microbe']] > float(rule['Value']))].index
+            mice_in_rule = [m for m in mice if m in mice_in_rule]
+            rule['Mice'] = mice_in_rule
 
-def get_relevant_genera(assay):
-    """Load the relevant genera from file
-    Args:
-        assay (str): The name of the assay
-    Returns:
-        list: The relevant genera
-    """
-    with open("data/relevant_genera.json", "r") as json_file:
-        relevant_genera = json.load(json_file)
-    return list(relevant_genera[assay])
+    recurse_tree(rules_dict[0], microbes.index)
+    # Create a DataFrame with the mice in each rule and save it
+    mice_in_rules_df = pd.DataFrame(columns=['Rule', 'Mice'])
+    for rule in rules_dict.items():
+        mice_in_rules_df.loc[len(mice_in_rules_df)] = [rule['Microbe'], rule['Mice']]
+    mice_in_rules_df.to_csv(os.path.join(data_dir, trait, "mice_in_rules.csv"), index=False)
+    return mice_in_rules_df
+        
+        
 
-def get_relevant_assays(genus):
-    """Load the relevant assays from file
-    Args:
-        genus (str): The name of the genus
-    Returns:
-        list: The relevant assays
-    """
-    with open("data/relevant_assays.json", "r") as json_file:
-        relevant_assays = json.load(json_file)
-    return list(relevant_assays[genus])
+def parse_data():
+    dotenv.load_dotenv()
+    data_dir = os.getenv("DATA_DIR")
+    folders = get_trait_folders(data_dir)
+    microbes = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
+    for trait in folders:
+        rules = parse_rules(trait, data_dir)
+        levels = apply_rules(rules, microbes, data_dir, trait)
+    return levels
 
-def load_tree(assay):
-    """Load the decision tree from file
-    Args:
-        assay (str): The name of the assay
-    Returns:
-        str: The decision tree rules
-    """
-    with open(f"data/{assay}/rules.txt", "r") as text_file:
-        tree_rules = text_file.read()
-    return tree_rules
-
-def get_mice(assay, node_id):
-    """Get the mouse IDs for a given node
-    Args:
-        assay (str): The name of the assay
-        node_id (int): The node ID
-    Returns:
-        pd.Series: The mouse IDs
-    """
-    mice_df = pd.read_csv(f'data/{assay}/mice.csv')
-    cohort = mice_df[mice_df['Node_ID'] == node_id]['Mouse_ID']
-    return cohort
-
-def get_genus_abundances(assay=None, node_id=None, genus=None):
-    """Get the genus abundances for a given assay
-    Args:
-        assay (str): The name of the assay
-        node_id (int): The node ID
-        genus (str): The name of the genus
-    Returns:
-        pd.Series: The genus abundances
-    """
-    genus_abundances_df = pd.read_csv('data/genus_abundances.csv', index_col=0)
-    mice = None
-    if assay:
-        relevant_genera = get_relevant_genera(assay)
-        if node_id:
-            # Get a list of mice for this node
-            mice = get_mice(assay, node_id)
-            # Filter by those mice
-            genus_abundances_df = genus_abundances_df.loc[mice]
-        # Filter by relevant genera
-        return genus_abundances_df[relevant_genera]
-    if genus:
-        # Get the subset for this genus
-        subset = genus_abundances_df[genus]
-        if mice:
-            return subset.loc[mice]
-        return subset
-    return genus_abundances_df
-
-def get_split_conditions(assay, genus):
-    """Get the split value for a given node and genus
-    Args:
-        assay (str): The name of the assay
-        genus (str): The name of the genus
-    Returns:
-        float: The split value
-        str: The split condition
-    """
-    tree_rules = load_tree(assay)
-    split_values = []
-    split_conditions = []
-    for line in tree_rules.split("\n"):
-        if genus in line:
-            split_conditions.append(line.split()[-2])
-            split_values.append(float(line.split()[-1]))
-    return split_values, split_conditions
-
-def is_relevant(assay, node_ID, genus):
-    """Check if a genus is relevant for a given node
-    Args:
-        assay (str): The name of the assay
-        node_ID (int): The node ID
-        genus (str): The name of the genus
-    Returns:
-        bool: Whether the genus is relevant
-    """
-    matrix = pd.read_csv(f"data/{assay}/matrix.csv", index_col=0)
-    return genus in matrix.columns and matrix.loc[genus, node_ID] > 0
+if __name__ == "__main__":
+    parse_data()

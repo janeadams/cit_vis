@@ -11,40 +11,40 @@ import pickle
 import networkx as nx
 
 
-def find_assays(genus):
+def find_traits(microbe):
     """
-    Given a summary tree, find assays for a specific genus and return as an array.
+    Given a summary tree, find traits for a specific microbe and return as an array.
 
     Parameters:
-        genus (str): The genus name for which assays need to be found.
+        microbe (str): The microbe name for which traits need to be found.
 
     Returns:
-        list: A list containing unique assays associated with the specified genus.
+        list: A list containing unique traits associated with the specified microbe.
     """
     # Load the processed summary tree from the pickle file.
     summary_tree = pd.read_pickle('new_processed_tree.pkl')
 
-    # Filter the summary tree based on the specified genus.
-    filt_source = summary_tree[summary_tree['genus'] == genus]
+    # Filter the summary tree based on the specified microbe.
+    filt_source = summary_tree[summary_tree['microbe'] == microbe]
 
-    # Extract the unique assays for the specified genus and store them in a list.
-    b_list = list(set(filt_source['assay']))
+    # Extract the unique traits for the specified microbe and store them in a list.
+    b_list = list(set(filt_source['trait']))
 
     return b_list
 
 def find_trees(path='data/conditional_inference_tree_results'):
     """
     Traverse the file structure to find all conditional inference trees;
-    Return a list of assays, trees, and their paths.
+    Return a list of traits, trees, and their paths.
 
     Returns:
         tuple: A tuple containing three lists:
-            1. A list of assays (directory names)
+            1. A list of traits (directory names)
             2. A list of conditional inference tree filenames
             3. A list of absolute paths to the corresponding trees
     """
-    # Initialize empty lists to store assays, trees, and their paths.
-    assays = []
+    # Initialize empty lists to store traits, trees, and their paths.
+    traits = []
     trees = []
     tree_paths = []
 
@@ -58,190 +58,190 @@ def find_trees(path='data/conditional_inference_tree_results'):
                 tree_paths.append(os.path.join(root, name))
 
         for name in dirs:
-            # Add the directory name to the assays list.
-            assays.append(name)
+            # Add the directory name to the traits list.
+            traits.append(name)
 
-    # Save the assays list as a pickle file named 'assays.pkl'.
-    with open('assays.pkl', 'wb') as f:
-        pickle.dump(assays, f)
+    # Save the traits list as a pickle file named 'traits.pkl'.
+    with open('traits.pkl', 'wb') as f:
+        pickle.dump(traits, f)
 
     # Return the three lists as a tuple.
-    return assays, trees, tree_paths
+    return traits, trees, tree_paths
 
 def read_abundance():
     """
-    Read abundance data from a CSV file and transpose it to get a DataFrame with genera as rows and samples as columns.
+    Read abundance data from a CSV file and transpose it to get a DataFrame with microbes as rows and samples as columns.
 
     Returns:
         tuple: A tuple containing two objects:
-            1. A DataFrame with abundance data, where rows represent genera and columns represent samples.
-            2. A pandas Index object containing the names of genera.
+            1. A DataFrame with abundance data, where rows represent microbes and columns represent samples.
+            2. A pandas Index object containing the names of microbes.
     """
     # Read abundance data from the CSV file and transpose it.
-    all_abundance = pd.read_csv('data/cecum_genus_counts_rankZ.csv', index_col=[0]).T
+    all_abundance = pd.read_csv('data/cecum_microbe_counts_rankZ.csv', index_col=[0]).T
 
-    # Get the names of the genera from the columns of the DataFrame.
-    genera = all_abundance.columns
+    # Get the names of the microbes from the columns of the DataFrame.
+    microbes = all_abundance.columns
 
-    # Return the DataFrame and the pandas Index object containing genera names as a tuple.
-    return all_abundance, genera
+    # Return the DataFrame and the pandas Index object containing microbes names as a tuple.
+    return all_abundance, microbes
 
 
-def read_assay():
+def read_trait():
     """
-    Read assay data from a CSV file and transpose it to get a DataFrame with assays as rows and samples as columns.
+    Read trait data from a CSV file and transpose it to get a DataFrame with traits as rows and samples as columns.
 
     Returns:
         tuple: A tuple containing two objects:
-            1. A DataFrame with assay data, where rows represent assays and columns represent samples.
-            2. A pandas Index object containing the names of assays.
+            1. A DataFrame with trait data, where rows represent traits and columns represent samples.
+            2. A pandas Index object containing the names of traits.
     """
-    # Read assay data from the CSV file and transpose it.
-    all_assay = pd.read_csv('data/novelty_assays_rankZ.csv', index_col=[0]).T
+    # Read trait data from the CSV file and transpose it.
+    all_trait = pd.read_csv('data/novelty_traits_rankZ.csv', index_col=[0]).T
 
-    # Get the names of the assays from the columns of the DataFrame.
-    assays = all_assay.columns
+    # Get the names of the traits from the columns of the DataFrame.
+    traits = all_trait.columns
 
-    # Return the DataFrame and the pandas Index object containing assay names as a tuple.
-    return all_assay, assays
+    # Return the DataFrame and the pandas Index object containing trait names as a tuple.
+    return all_trait, traits
 
 
-def get_split_df(assay):
+def get_split_df(trait):
     """
-    Given a assay, traverse the file structure to find and process node CSV files.
-    Construct a DataFrame (split_df) containing node information and a list of DataFrames (node_dfs) for each node.
+    Given a trait, traverse the file structure to find and process group CSV files.
+    Construct a DataFrame (split_df) containing group information and a list of DataFrames (group_dfs) for each group.
 
     Parameters:
-        assay (str): The assay for which to retrieve node information.
+        trait (str): The trait for which to retrieve group information.
 
     Returns:
         tuple: A tuple containing two objects:
-            1. A DataFrame (split_df) with information from the node CSV file corresponding to 'node.split.values'.
-            2. A list of DataFrames (node_dfs) containing information from each node CSV file (excluding 'node.split.values').
+            1. A DataFrame (split_df) with information from the group CSV file corresponding to 'group.split.values'.
+            2. A list of DataFrames (group_dfs) containing information from each group CSV file (excluding 'group.split.values').
     """
-    node_paths = []  # List to store the paths of node CSV files.
-    node_dfs = []    # List to store DataFrames of each node CSV file.
+    group_paths = []  # List to store the paths of group CSV files.
+    group_dfs = []    # List to store DataFrames of each group CSV file.
 
-    split_df = pd.DataFrame()  # DataFrame to store information from the 'node.split.values' CSV file.
+    split_df = pd.DataFrame()  # DataFrame to store information from the 'group.split.values' CSV file.
 
-    # Traverse the file structure for the specified assay.
-    for root, dirs, files in os.walk(f'conditional_inference_tree_results/{assay}', topdown=False):
+    # Traverse the file structure for the specified trait.
+    for root, dirs, files in os.walk(f'conditional_inference_tree_results/{trait}', topdown=False):
         for name in files:
-            if ('node' in name) & ('.csv' in name):
-                # If the file name contains 'node' and ends with '.csv', it's a node CSV file.
-                node_path = os.path.join(root, name)
-                node_paths.append(node_path)
+            if ('group' in name) & ('.csv' in name):
+                # If the file name contains 'group' and ends with '.csv', it's a group CSV file.
+                group_path = os.path.join(root, name)
+                group_paths.append(group_path)
 
-                node_df = pd.read_csv(node_path)  # Read the node CSV file.
+                group_df = pd.read_csv(group_path)  # Read the group CSV file.
 
-                node_number = name.split('_')[-1][4:-4]  # Extract the node number from the file name.
+                group_number = name.split('_')[-1][4:-4]  # Extract the group number from the file name.
 
-                if node_number != 'node.split.values':
-                    # If it's not the 'node.split.values' file, process and add it to the node_dfs list.
-                    node_df['node'] = node_number
-                    node_df['node_avg'] = node_df[assay].mean()
+                if group_number != 'group.split.values':
+                    # If it's not the 'group.split.values' file, process and add it to the group_dfs list.
+                    group_df['group'] = group_number
+                    group_df['group_avg'] = group_df[trait].mean()
 
-                    # Find the column containing the split_genus and assign it to the 'split_genus' variable.
-                    for c in node_df.columns:
+                    # Find the column containing the split_microbe and assign it to the 'split_microbe' variable.
+                    for c in group_df.columns:
                         if ('ranknorm' in c) & ('g__' in c):
-                            split_genus = c
+                            split_microbe = c
 
-                    node_df['split_genus'] = split_genus
-                    node_df['genus_val'] = node_df[split_genus]
-                    node_dfs.append(node_df)
+                    group_df['split_microbe'] = split_microbe
+                    group_df['microbe_val'] = group_df[split_microbe]
+                    group_dfs.append(group_df)
                 else:
-                    # If it's the 'node.split.values' file, assign it to the split_df DataFrame.
-                    split_df = node_df
+                    # If it's the 'group.split.values' file, assign it to the split_df DataFrame.
+                    split_df = group_df
 
-    return split_df, node_dfs
+    return split_df, group_dfs
 
 
 def map_ranks(cols):
     """
-    Map rank values to descriptive assay names based on their position in the input list.
+    Map rank values to descriptive trait names based on their position in the input list.
 
     Parameters:
-        cols (list): A list containing rank values (assay levels) to be mapped to descriptive assay names.
+        cols (list): A list containing rank values (trait levels) to be mapped to descriptive trait names.
 
     Returns:
-        dict: A dictionary mapping rank values to corresponding descriptive assay names.
+        dict: A dictionary mapping rank values to corresponding descriptive trait names.
     """
     new_names = {}  # Create an empty dictionary to store the mappings.
 
     for i, col in enumerate(cols):
         if i == 0:
-            name = 'Very low assay'
+            name = 'Very low trait'
         elif i == 1:
-            name = 'Low assay'
+            name = 'Low trait'
         # elif i == 2:
-        #     name = 'Somewhat low assay'
+        #     name = 'Somewhat low trait'
         elif i == (len(cols) - 1):
-            name = 'Very high assay'
+            name = 'Very high trait'
         elif i == (len(cols) - 2):
-            name = 'High assay'
+            name = 'High trait'
         # elif i == (len(cols) - 3):
-        #     name = 'Somewhat high assay'
+        #     name = 'Somewhat high trait'
         else:
             name = 'medium'
 
-        new_names[col] = name  # Add the mapping of the rank value to the assay name in the dictionary.
+        new_names[col] = name  # Add the mapping of the rank value to the trait name in the dictionary.
 
     return new_names
 
 
-def get_leaf_df(assay, grouped=False):
+def get_leaf_df(trait, grouped=False):
     """
-    Given a assay, retrieve leaf information related to that assay.
+    Given a trait, retrieve leaf information related to that trait.
 
     Parameters:
-        assay (str): The assay for which to retrieve leaf information.
-        grouped (bool, optional): If True, the leaf nodes will be grouped into 'low', 'medium', and 'high' based on their rank. If False, nodes will be grouped based on their numeric rank. Defaults to False.
+        trait (str): The trait for which to retrieve leaf information.
+        grouped (bool, optional): If True, the leaf groups will be grouped into 'low', 'medium', and 'high' based on their rank. If False, groups will be grouped based on their numeric rank. Defaults to False.
 
     Returns:
-        pandas.DataFrame: A DataFrame containing leaf information, including Mouse_ID, assay values, node information, node averages, split_genus, genus_val, node_rank, and group.
+        pandas.DataFrame: A DataFrame containing leaf information, including Mouse_ID, trait values, group information, group averages, split_microbe, microbe_val, group_rank, and group.
     """
-    # Retrieve split_df and node_dfs using the get_split_df function.
-    split_df, node_dfs = get_split_df(assay)
+    # Retrieve split_df and group_dfs using the get_split_df function.
+    split_df, group_dfs = get_split_df(trait)
 
     # Extract the leaves from split_df.
-    leaves = list(split_df[split_df['inner_node_pvalue'].isnull()]['node'].values)
+    leaves = list(split_df[split_df['inner_group_pvalue'].isnull()]['group'].values)
 
-    # Concatenate the node DataFrames and sort by 'node_avg'.
-    leaf_df = pd.concat(node_dfs).sort_values(by='node_avg')
+    # Concatenate the group DataFrames and sort by 'group_avg'.
+    leaf_df = pd.concat(group_dfs).sort_values(by='group_avg')
 
-    # Filter leaf_df to include only rows corresponding to leaf nodes.
-    leaf_df = leaf_df[leaf_df['node'].isin([str(l) for l in leaves])]
+    # Filter leaf_df to include only rows corresponding to leaf groups.
+    leaf_df = leaf_df[leaf_df['group'].isin([str(l) for l in leaves])]
 
     # Select relevant columns for the leaf_df.
-    leaf_df = leaf_df.filter(['Mouse_ID', assay, 'node', 'node_avg', 'split_genus', 'genus_val'])
+    leaf_df = leaf_df.filter(['Mouse_ID', trait, 'group', 'group_avg', 'split_microbe', 'microbe_val'])
 
-    # Create a dictionary for mapping node values to their ranks.
-    n_ordlist = list(dict.fromkeys(leaf_df['node']))
-    node_rank = dict(zip(n_ordlist, range(0, len(n_ordlist))))
+    # Create a dictionary for mapping group values to their ranks.
+    n_ordlist = list(dict.fromkeys(leaf_df['group']))
+    group_rank = dict(zip(n_ordlist, range(0, len(n_ordlist))))
 
-    # Add a new column 'node_rank' to leaf_df, which contains the rank of each node.
-    leaf_df['node_rank'] = [node_rank[n] for n in leaf_df['node']]
+    # Add a new column 'group_rank' to leaf_df, which contains the rank of each group.
+    leaf_df['group_rank'] = [group_rank[n] for n in leaf_df['group']]
 
     if grouped:
-        # If 'grouped' is True, group the leaf nodes into 'low', 'medium', and 'high' based on their rank.
-        leaf_df['group'] = ['low' if n in n_ordlist[:2] else 'high' if n in n_ordlist[-2:] else 'medium' for n in leaf_df['node']]
+        # If 'grouped' is True, group the leaf groups into 'low', 'medium', and 'high' based on their rank.
+        leaf_df['group'] = ['low' if n in n_ordlist[:2] else 'high' if n in n_ordlist[-2:] else 'medium' for n in leaf_df['group']]
     else:
-        # If 'grouped' is False, group the leaf nodes based on their numeric rank.
-        rank_map = map_ranks(list(set(leaf_df['node_rank'])))
-        leaf_df['group'] = [rank_map[n] for n in leaf_df['node_rank']]
+        # If 'grouped' is False, group the leaf groups based on their numeric rank.
+        rank_map = map_ranks(list(set(leaf_df['group_rank'])))
+        leaf_df['group'] = [rank_map[n] for n in leaf_df['group_rank']]
 
     # Duplicate Check
     leaf_df['isDupe'] = leaf_df.duplicated(subset=['Mouse_ID'], keep=False)
     leaf_df[leaf_df['isDupe'] == True].sort_values(by='Mouse_ID')
 
-    # Read abundance data and add it to the leaf_df for each genus.
+    # Read abundance data and add it to the leaf_df for each microbe.
     all_abundance = read_abundance()[0]
-    for genus in list(all_abundance.columns):
-        if genus+'_ranknorm' in list(set(leaf_df['split_genus'])):
+    for microbe in list(all_abundance.columns):
+        if microbe+'_ranknorm' in list(set(leaf_df['split_microbe'])):
             vals = []
             for mouse in leaf_df['Mouse_ID']:
-                vals.append(all_abundance.loc[[str(mouse)]][genus][0])
-            leaf_df[genus] = vals
+                vals.append(all_abundance.loc[[str(mouse)]][microbe][0])
+            leaf_df[microbe] = vals
 
     return leaf_df
 
@@ -321,15 +321,15 @@ def show_strip(b):
     Create and display a strip plot using Plotly.
 
     Parameters:
-        b (str): The assay for which the strip plot needs to be created.
+        b (str): The trait for which the strip plot needs to be created.
 
     Returns:
         plotly.graph_objects.Figure: A Plotly figure object representing the strip plot.
     """
-    # Get the leaf information DataFrame related to the specified assay.
+    # Get the leaf information DataFrame related to the specified trait.
     leaf_df = get_leaf_df(b)
 
-    # Create a strip plot using Plotly express, setting 'y' as the specified assay,
+    # Create a strip plot using Plotly express, setting 'y' as the specified trait,
     # 'color' as the 'group' column from the leaf_df DataFrame, and using specific colors from the assign_diverging_colors function.
     fig = px.strip(leaf_df, y=b, color="group", color_discrete_map=assign_diverging_colors(list(leaf_df['group'].unique())), hover_data=['Mouse_ID'])
 
@@ -339,66 +339,66 @@ def show_strip(b):
     return fig
 
 
-def categorize_abundance(genus, all_abundance=read_abundance()[0]):
+def categorize_abundance(microbe, all_abundance=read_abundance()[0]):
     """
-    Categorize the abundance of a genus for each mouse into 'low', 'medium', or 'high' groups.
+    Categorize the abundance of a microbe for each mouse into 'low', 'medium', or 'high' groups.
 
     Parameters:
-        genus (str): The genus for which abundance needs to be categorized.
-        all_abundance (pandas.DataFrame, optional): The DataFrame containing abundance data for all genera. Defaults to the abundance data obtained from read_abundance().
+        microbe (str): The microbe for which abundance needs to be categorized.
+        all_abundance (pandas.DataFrame, optional): The DataFrame containing abundance data for all microbes. Defaults to the abundance data obtained from read_abundance().
 
     Returns:
         pandas.DataFrame: A DataFrame containing the abundance values and the assigned group for each mouse.
     """
     # Filter mice with low and high abundance based on specified thresholds (< -1 and > 1, respectively).
-    low_mice = list(all_abundance[all_abundance[genus] < -1].index)
-    high_mice = list(all_abundance[all_abundance[genus] > 1].index)
+    low_mice = list(all_abundance[all_abundance[microbe] < -1].index)
+    high_mice = list(all_abundance[all_abundance[microbe] > 1].index)
 
-    # Create a new DataFrame containing the abundance of the specified genus and the assigned group for each mouse.
+    # Create a new DataFrame containing the abundance of the specified microbe and the assigned group for each mouse.
     new_df = all_abundance.copy()
-    new_df = new_df.filter([genus])
+    new_df = new_df.filter([microbe])
     new_df['group'] = ['low' if mouse in low_mice else 'high' if mouse in high_mice else 'medium' for mouse in list(all_abundance.index)]
     new_df = new_df.sort_values(by='group')
 
     return new_df
 
 
-def get_abundance_df(genus, all_assay=read_assay()[0]):
+def get_abundance_df(microbe, all_trait=read_trait()[0]):
     """
-    Combine abundance data and assay data for a given genus and create a DataFrame with mouse abundance and assay information.
+    Combine abundance data and trait data for a given microbe and create a DataFrame with mouse abundance and trait information.
 
     Parameters:
-        genus (str): The genus for which abundance and assay data needs to be combined.
-        all_assay (pandas.DataFrame, optional): The DataFrame containing assay data for all genera. Defaults to the assay data obtained from read_assay().
+        microbe (str): The microbe for which abundance and trait data needs to be combined.
+        all_trait (pandas.DataFrame, optional): The DataFrame containing trait data for all microbes. Defaults to the trait data obtained from read_trait().
 
     Returns:
-        pandas.DataFrame: A DataFrame containing mouse ID, abundance, and assay information for the specified genus.
+        pandas.DataFrame: A DataFrame containing mouse ID, abundance, and trait information for the specified microbe.
     """
-    # Categorize the abundance of the specified genus for each mouse into 'low', 'medium', or 'high' groups.
-    ab_cats = categorize_abundance(genus)
+    # Categorize the abundance of the specified microbe for each mouse into 'low', 'medium', or 'high' groups.
+    ab_cats = categorize_abundance(microbe)
 
-    # Filter the assay data to include only the assays associated with the specified genus.
-    assay_subset = all_assay.filter(find_assays(genus))
+    # Filter the trait data to include only the traits associated with the specified microbe.
+    trait_subset = all_trait.filter(find_traits(microbe))
 
-    # Combine the abundance data and assay data using the mouse ID as the index.
-    abundance_df = ab_cats.join(assay_subset)
+    # Combine the abundance data and trait data using the mouse ID as the index.
+    abundance_df = ab_cats.join(trait_subset)
 
     # Reset the index and rename the column 'index' to 'Mouse_ID'.
     abundance_df = abundance_df.reset_index().rename(columns={'index': 'Mouse_ID'})
 
     return abundance_df
 
-def get_assay_df(assay, summary_tree=None, abundance_data=read_abundance()[0]):
+def get_trait_df(trait, summary_tree=None, abundance_data=read_abundance()[0]):
     """
-    Get a DataFrame containing abundance data for the genera associated with the specified assay.
+    Get a DataFrame containing abundance data for the microbes associated with the specified trait.
 
     Parameters:
-        assay (str): The assay for which abundance data is needed.
+        trait (str): The trait for which abundance data is needed.
         summary_tree (pandas.DataFrame, optional): The DataFrame containing the summary tree. Defaults to the DataFrame obtained from reading 'new_processed_tree.pkl'.
-        abundance_data (pandas.DataFrame, optional): The DataFrame containing abundance data for all genera. Defaults to the abundance data obtained from read_abundance().
+        abundance_data (pandas.DataFrame, optional): The DataFrame containing abundance data for all microbes. Defaults to the abundance data obtained from read_abundance().
 
     Returns:
-        pandas.DataFrame: A DataFrame containing abundance data for the genera associated with the specified assay.
+        pandas.DataFrame: A DataFrame containing abundance data for the microbes associated with the specified trait.
     """
     if summary_tree is None:
         try:
@@ -406,19 +406,19 @@ def get_assay_df(assay, summary_tree=None, abundance_data=read_abundance()[0]):
         except:
             print('Did you run find_trees() yet?')
 
-    # Filter the summary tree to get a subset containing only the rows with the specified assay.
-    subset = summary_tree[summary_tree['assay'] == assay]
+    # Filter the summary tree to get a subset containing only the rows with the specified trait.
+    subset = summary_tree[summary_tree['trait'] == trait]
 
-    # Get the unique genera associated with the specified assay.
-    genera = list(set(subset['genus']))
+    # Get the unique microbes associated with the specified trait.
+    microbes = list(set(subset['microbe']))
 
-    # Filter the abundance data to include only the columns corresponding to the genera associated with the assay.
-    subdf = abundance_data.filter(genera)
+    # Filter the abundance data to include only the columns corresponding to the microbes associated with the trait.
+    subdf = abundance_data.filter(microbes)
 
     return subdf
 
 
-def get_genera(cols):
+def get_microbes(cols):
     """
     Extract column names that contain the string 'g__' in them.
 
@@ -436,7 +436,7 @@ def get_genera(cols):
     return g_list
 
 
-def get_assays(cols):
+def get_traits(cols):
     """
     Extract column names that contain the string 'ranknorm' in them.
 
@@ -500,7 +500,7 @@ def setup_chart(subject, grouped=False, drop='medium', diverging=True):
     Set up data and configurations for a chart.
 
     Parameters:
-        subject (str): The subject of the chart, either 'genus' or a specific assay.
+        subject (str): The subject of the chart, either 'microbe' or a specific trait.
         grouped (bool, optional): If True, the data will be grouped. Defaults to False.
         drop (str, optional): A category to be dropped from the 'cols'. Defaults to 'medium'.
         diverging (bool, optional): If True, diverging colors will be used. Defaults to True.
@@ -509,13 +509,13 @@ def setup_chart(subject, grouped=False, drop='medium', diverging=True):
         tuple: A tuple containing view_df (DataFrame), cols (list), rows (list), and color_lookup (dict).
     """
     if 'g__' in subject:
-        view = 'genus'
+        view = 'microbe'
         view_df = get_abundance_df(subject)
-        rows = get_assays(view_df.columns)
+        rows = get_traits(view_df.columns)
     else:
-        view = 'assay'
+        view = 'trait'
         view_df = get_leaf_df(subject, grouped=grouped)
-        rows = get_genera(view_df.columns)
+        rows = get_microbes(view_df.columns)
 
     cols = list(view_df['group'].unique())
     try:
@@ -534,7 +534,7 @@ def setup_chart(subject, grouped=False, drop='medium', diverging=True):
 
 def make_violin_matrix(subject, grouped=False, drop='medium'):
     """
-    Generate a matrix of violin plots based on the specified subject (genus or assay).
+    Generate a matrix of violin plots based on the specified subject (microbe or trait).
 
     Parameters:
         subject (str): The subject for which the matrix of violin plots needs to be created.
@@ -611,25 +611,25 @@ def make_violin_matrix(subject, grouped=False, drop='medium'):
 
     return fig
 
-def make_simple_scatter(assay, genus):
+def make_simple_scatter(trait, microbe):
     """
-    Generate a scatter plot based on the specified assay and genus data.
+    Generate a scatter plot based on the specified trait and microbe data.
 
     Parameters:
-        assay (str): The assay for the x-axis of the scatter plot.
-        genus (str): The genus for the y-axis of the scatter plot.
+        trait (str): The trait for the x-axis of the scatter plot.
+        microbe (str): The microbe for the y-axis of the scatter plot.
 
     Returns:
         plotly.graph_objects.Figure: A Plotly figure object representing the scatter plot.
     """
-    # Get the DataFrame containing the leaf data for the specified assay.
-    df = get_leaf_df(assay)
+    # Get the DataFrame containing the leaf data for the specified trait.
+    df = get_leaf_df(trait)
 
     # Assign diverging colors to different groups in the scatter plot.
     color_lookup = assign_diverging_colors(list(set(df['group'])))
 
     # Create the scatter plot using Plotly's px.scatter function.
-    fig = px.scatter(df, x=assay, y=genus, color='group', color_discrete_map=color_lookup)
+    fig = px.scatter(df, x=trait, y=microbe, color='group', color_discrete_map=color_lookup)
 
     # Update the appearance of the scatter plot's markers.
     fig.update_traces(marker=dict(size=12, opacity=0.8,
@@ -641,20 +641,20 @@ def make_simple_scatter(assay, genus):
 
     return fig
 
-def make_scatter_column(assay):
+def make_scatter_column(trait):
     """
-    Generate a column of scatter plots based on the specified assay.
+    Generate a column of scatter plots based on the specified trait.
 
     Parameters:
-        assay (str): The assay for the x-axis of the scatter plots.
+        trait (str): The trait for the x-axis of the scatter plots.
 
     Returns:
         plotly.graph_objects.Figure: A Plotly figure object representing the column of scatter plots.
     """
-    # Get the DataFrame containing the leaf data for the specified assay.
-    leaf_df = get_leaf_df(assay)
+    # Get the DataFrame containing the leaf data for the specified trait.
+    leaf_df = get_leaf_df(trait)
 
-    # Get the genus names present in the leaf DataFrame.
+    # Get the microbe names present in the leaf DataFrame.
     gen_names = []
     for col in leaf_df.columns:
         if 'g__' in col:
@@ -670,11 +670,11 @@ def make_scatter_column(assay):
         for j, cohort in enumerate(list(set(leaf_df['group']))):
             subset = leaf_df[leaf_df['group'] == cohort]
 
-            # Add a Scatter plot to the figure for the specific genus and cohort.
-            # Each subplot in the column represents a different genus (y-axis) against the assay (x-axis).
+            # Add a Scatter plot to the figure for the specific microbe and cohort.
+            # Each subplot in the column represents a different microbe (y-axis) against the trait (x-axis).
             fig.add_trace(
                 go.Scatter(
-                    x=subset[assay],
+                    x=subset[trait],
                     y=subset[gen],
                     legendgroup=cohort,
                     name=cohort,
@@ -689,11 +689,11 @@ def make_scatter_column(assay):
                 col=1
             )
 
-            # Update y-axis title to display the genus name.
+            # Update y-axis title to display the microbe name.
             fig.update_yaxes(title_text=f'{gen[3:].replace("_", " ")}', row=i+1, col=1)
 
-            # Update x-axis title to display the assay name.
-            fig.update_xaxes(title_text=f'{assay[:-15].replace("_", " ")}', row=i+1, col=1)
+            # Update x-axis title to display the trait name.
+            fig.update_xaxes(title_text=f'{trait[:-15].replace("_", " ")}', row=i+1, col=1)
 
     # Update the appearance of the scatter plot's markers.
     fig.update_traces(marker=dict(size=10, opacity=0.5,
@@ -701,13 +701,13 @@ def make_scatter_column(assay):
                                         color='DarkSlateGrey')))
 
     # Update the layout of the figure.
-    fig.update_layout(template='plotly_white', title=clean(assay), height=250*len(gen_names))
+    fig.update_layout(template='plotly_white', title=clean(trait), height=250*len(gen_names))
 
     return fig
 
 def make_scatter_matrix(subject, grouped=False, drop='medium'):
     """
-    Generate a matrix of scatter plots based on the specified subject (genus or assay).
+    Generate a matrix of scatter plots based on the specified subject (microbe or trait).
 
     Parameters:
         subject (str): The subject for which the matrix of scatter plots needs to be created.
@@ -810,7 +810,7 @@ def add_all(view_df, drop='medium'):
 
 def make_strip(subject, grouped=False, drop='medium', diverging=False):
     """
-    Generate a strip plot based on the specified subject (genus or assay).
+    Generate a strip plot based on the specified subject (microbe or trait).
 
     Parameters:
         subject (str): The subject for which the strip plot needs to be created.
@@ -844,7 +844,7 @@ def make_strip(subject, grouped=False, drop='medium', diverging=False):
 
 def make_hist(subject, grouped=False, drop='medium'):
     """
-    Generate a histogram based on the specified subject (genus or assay).
+    Generate a histogram based on the specified subject (microbe or trait).
 
     Parameters:
         subject (str): The subject for which the histogram needs to be created.
@@ -879,34 +879,34 @@ def make_hist(subject, grouped=False, drop='medium'):
 
     return fig
 
-def make_abundance_plot(assay):
+def make_abundance_plot(trait):
     """
-    Generate a strip plot showing the abundance of different genera (genera) for a given assay.
+    Generate a strip plot showing the abundance of different microbes (microbes) for a given trait.
 
     Parameters:
-        assay (str): The assay for which the abundance plot needs to be created.
+        trait (str): The trait for which the abundance plot needs to be created.
 
     Returns:
         plotly.graph_objects.Figure: A Plotly figure object representing the abundance plot.
     """
-    # Get the leaf DataFrame for the given assay.
-    leaf_df = get_leaf_df(assay)
+    # Get the leaf DataFrame for the given trait.
+    leaf_df = get_leaf_df(trait)
 
-    # Extract the names of genera from the columns of the leaf DataFrame.
+    # Extract the names of microbes from the columns of the leaf DataFrame.
     gen_names = []
     for col in leaf_df.columns:
         if 'g__' in col:
             gen_names.append(col)
 
-    # Create a new DataFrame with the abundance data for each genus unstacked.
+    # Create a new DataFrame with the abundance data for each microbe unstacked.
     leaf_df = pd.DataFrame(leaf_df.filter(gen_names).unstack())
 
     # Create the strip plot using Plotly's px.strip function.
     fig = px.strip(x=leaf_df.droplevel(1).index, y=list(leaf_df[0]))
 
     # Update the layout of the strip plot.
-    fig.update_layout(template='plotly_white', title=assay[:-15].replace('_', ' '))
-    fig.update_xaxes(title='Genus')
+    fig.update_layout(template='plotly_white', title=trait[:-15].replace('_', ' '))
+    fig.update_xaxes(title='Microbe')
     fig.update_yaxes(title='Abundance')
 
     return fig
@@ -916,10 +916,10 @@ import dash_bio as dashbio
 
 def dendrogram(df, col, ascending=False):
     """
-    Generate a clustergram (dendrogram) to visualize the comparison of genus pairs based on a specified column.
+    Generate a clustergram (dendrogram) to visualize the comparison of microbe pairs based on a specified column.
 
     Parameters:
-        df (pd.DataFrame): The DataFrame containing the data for genus pairs.
+        df (pd.DataFrame): The DataFrame containing the data for microbe pairs.
         col (str): The column in the DataFrame to be used for the comparison.
         ascending (bool, optional): If True, the data will be sorted in ascending order. Defaults to False.
 
@@ -952,43 +952,43 @@ def dendrogram(df, col, ascending=False):
     fig.update_layout(
         width=800,
         height=800,
-        title=f"<b>Comparison of Genus Pairs<br>by {col.replace('_', ' ').title()}</b>"
+        title=f"<b>Comparison of Microbe Pairs<br>by {col.replace('_', ' ').title()}</b>"
     )
 
     return fig
 
 def parse_trees(tree_paths):
     """
-    Process the content of multiple tree files and return a summarized DataFrame with node information for each tree,
+    Process the content of multiple tree files and return a summarized DataFrame with group information for each tree,
     along with a summary DataFrame that contains the verification information for each tree.
 
     Parameters:
         tree_paths (list): A list of file paths containing the tree data.
 
     Returns:
-        pd.DataFrame: A DataFrame containing node information for all trees.
+        pd.DataFrame: A DataFrame containing group information for all trees.
     """
-    node_dfs = []  # A list to store DataFrames containing node information for each tree
-    summary_df = pd.DataFrame(columns=['assay', 'inner', 'inner_checksum', 'outer', 'outer_checksum'])
+    group_dfs = []  # A list to store DataFrames containing group information for each tree
+    summary_df = pd.DataFrame(columns=['trait', 'inner', 'inner_checksum', 'outer', 'outer_checksum'])
 
     # Process each tree file
     for tree_path in tree_paths:
-        assay = tree_path.split('/')[1]
+        trait = tree_path.split('/')[1]
         summary_row = {
-            'assay': assay,
+            'trait': trait,
             'inner': None,
             'inner_checksum': False,
             'outer': None,
             'outer_checksum': False
         }
 
-        node_df = pd.DataFrame(columns=['genus', 'split', 'split_value', 'depth', 'isLeaf', 'y_mean', 'node_n', 'err', 'nobs'])
+        group_df = pd.DataFrame(columns=['microbe', 'split', 'split_value', 'depth', 'isLeaf', 'y_mean', 'group_n', 'err', 'nobs'])
 
         # Read the content of the tree file and split it into lines
         with open(tree_path) as f:
             content = f.read().replace('"', '').split('\n')
 
-        # Find the location of the root node in the content
+        # Find the location of the root group in the content
         root_loc = None
         for ix, c in enumerate(content):
             if 'root' in c:
@@ -1002,13 +1002,13 @@ def parse_trees(tree_paths):
             simplified = line[6:].strip().replace(',', '').replace('(', '').replace(')', '')
             words = simplified.split(' ')
             row = {
-                'genus': None,
+                'microbe': None,
                 'split': None,
                 'split_value': None,
                 'depth': None,
                 'isLeaf': False,
                 'y_mean': None,
-                'node_n': 1,
+                'group_n': 1,
                 'nobs': None,
                 'err': None,
             }
@@ -1019,7 +1019,7 @@ def parse_trees(tree_paths):
                     row['split'] = w
                     row['split_value'] = float(words[ix + 1].replace(':', ''))
                 if "g__" in w:
-                    row['genus'] = w
+                    row['microbe'] = w
                 if w == 'n':
                     row['isLeaf'] = True
                     row['y_mean'] = float(words[ix - 1])
@@ -1027,19 +1027,19 @@ def parse_trees(tree_paths):
                     row['err'] = float(words[ix + 5])
                 if len(w) > 0:
                     if (w[0] == '[') and (w[-1] == ']'):
-                        row['node_n'] = int(w.replace(']', '').replace('[', ''))
+                        row['group_n'] = int(w.replace(']', '').replace('[', ''))
 
             if row['isLeaf'] == False:
                 inner_count += 1
             else:
                 leaf_count += 1
 
-            # Concatenate the row to the node DataFrame
+            # Concatenate the row to the group DataFrame
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore")
-                node_df = pd.concat([node_df, pd.DataFrame(row, index=[0])], ignore_index=True)
+                group_df = pd.concat([group_df, pd.DataFrame(row, index=[0])], ignore_index=True)
 
-        # Extract the verification information for inner and outer nodes
+        # Extract the verification information for inner and outer groups
         verification_strings = content[-3:-1]
         for s in verification_strings:
             words = s.split(' ')
@@ -1053,58 +1053,58 @@ def parse_trees(tree_paths):
                 summary_row['outer'] = val
                 summary_row['outer_checksum'] = ((int(val) - leaf_count) == 0)
 
-        # Add the assay column to the node DataFrame and append it to the list
-        node_df['assay'] = assay
-        node_dfs.append(node_df)
+        # Add the trait column to the group DataFrame and append it to the list
+        group_df['trait'] = trait
+        group_dfs.append(group_df)
 
         # Concatenate the summary_row to the summary DataFrame
         summary_df = pd.concat([summary_df, pd.Series(summary_row).to_frame().T], ignore_index=True)
 
-    # Concatenate all the node DataFrames into a single DataFrame
-    all_nodes = pd.concat(node_dfs, ignore_index=True)
-    return all_nodes
+    # Concatenate all the group DataFrames into a single DataFrame
+    all_groups = pd.concat(group_dfs, ignore_index=True)
+    return all_groups
 
 
-def find_parent(node_n, depth, single_tree):
+def find_parent(group_n, depth, single_tree):
     """
-    Find the parent node of a given node within a tree.
+    Find the parent group of a given group within a tree.
 
     Parameters:
-        node_n (int): Node number of the node for which to find the parent.
-        depth (int): Depth of the node within the tree.
-        single_tree (pd.DataFrame): DataFrame containing node information for a single tree.
+        group_n (int): Group number of the group for which to find the parent.
+        depth (int): Depth of the group within the tree.
+        single_tree (pd.DataFrame): DataFrame containing group information for a single tree.
 
     Returns:
-        int: Node number of the parent node, or 1 if the node is at depth 0 (root).
+        int: Group number of the parent group, or 1 if the group is at depth 0 (root).
     """
     if depth > 0:
-        # Create a copy of the DataFrame containing nodes one level above the given depth
+        # Create a copy of the DataFrame containing groups one level above the given depth
         one_aboves = single_tree[single_tree['depth'] == depth - 1].copy()
-        node_list = one_aboves['node_n']
-        # Filter the list of nodes to include only those with node numbers less than the given node_n
-        filt_list = [n for n in node_list if n < node_n]
-        # Return the node number of the last (highest) node in the filtered list,
-        # which corresponds to the parent node of the given node
+        group_list = one_aboves['group_n']
+        # Filter the list of groups to include only those with group numbers less than the given group_n
+        filt_list = [n for n in group_list if n < group_n]
+        # Return the group number of the last (highest) group in the filtered list,
+        # which corresponds to the parent group of the given group
         return filt_list[-1]
     else:
-        # If the node is at depth 0 (root), return node number 1, which indicates the root node itself.
+        # If the group is at depth 0 (root), return group number 1, which indicates the root group itself.
         return 1
 
-def get_tree(assay, all_nodes):
+def get_tree(trait, all_groups):
     """
-    Get information about a single tree for a specific assay.
+    Get information about a single tree for a specific trait.
 
     Parameters:
-        assay (str): The name of the assay.
-        all_nodes (DataFrame): DataFrame containing information about all trees.
+        trait (str): The name of the trait.
+        all_groups (DataFrame): DataFrame containing information about all trees.
 
     Returns:
-        DataFrame: DataFrame containing information about the single tree for the given assay.
+        DataFrame: DataFrame containing information about the single tree for the given trait.
     """
-    # Filter the DataFrame to get the nodes for the specified assay
-    single_tree = all_nodes[all_nodes['assay'] == assay]
+    # Filter the DataFrame to get the groups for the specified trait
+    single_tree = all_groups[all_groups['trait'] == trait]
 
-    # Calculate the number of observations (nobs) for each node and handle missing values
+    # Calculate the number of observations (nobs) for each group and handle missing values
     nobs = list(single_tree['nobs'])
     nobs.reverse()
     for i, nob in enumerate(nobs):
@@ -1113,11 +1113,11 @@ def get_tree(assay, all_nodes):
     nobs.reverse()
     single_tree['nobs'] = nobs
 
-    # Calculate the parent node for each node in the tree
-    single_tree['parent'] = [find_parent(n, d, single_tree) for n, d in zip(single_tree['node_n'], single_tree['depth'])]
+    # Calculate the parent group for each group in the tree
+    single_tree['parent'] = [find_parent(n, d, single_tree) for n, d in zip(single_tree['group_n'], single_tree['depth'])]
 
-    # Remove nodes with missing genus information
-    single_tree = single_tree[single_tree['genus'].notna()]
+    # Remove groups with missing microbe information
+    single_tree = single_tree[single_tree['microbe'].notna()]
 
     # Create a color mapping based on the y_mean values
     colormap = cm.get_cmap('RdYlGn', 100)
@@ -1127,21 +1127,21 @@ def get_tree(assay, all_nodes):
     return single_tree
 
 
-def process_trees(assays):
+def process_trees(traits):
     """
-    Process the trees for the given assays, create tree plots, and save the results.
+    Process the trees for the given traits, create tree plots, and save the results.
 
     Parameters:
-        assays (list): A list of assay names.
+        traits (list): A list of trait names.
 
     Returns:
-        DataFrame: A DataFrame containing the processed tree data for all assays.
+        DataFrame: A DataFrame containing the processed tree data for all traits.
     """
     processed_trees = []
 
-    # Loop through each assay and create tree plots
-    for assay in assays:
-        processed_trees.append(get_tree(assay))
+    # Loop through each trait and create tree plots
+    for trait in traits:
+        processed_trees.append(get_tree(trait))
 
     # Combine the processed tree data into a single DataFrame
     processed_df = pd.concat(processed_trees)
@@ -1153,89 +1153,89 @@ def process_trees(assays):
     return processed_df
 
 
-def get_genus_co(processed_df):
+def get_microbe_co(processed_df):
     """
-    Get co-occurrence information for genera and assays from the processed DataFrame.
+    Get co-occurrence information for microbes and traits from the processed DataFrame.
 
     Parameters:
-        processed_df (DataFrame): A DataFrame containing processed tree data for assays.
+        processed_df (DataFrame): A DataFrame containing processed tree data for traits.
 
     Returns:
-        DataFrame: A DataFrame containing co-occurrence information for genera and assays.
+        DataFrame: A DataFrame containing co-occurrence information for microbes and traits.
     """
-    # Group assays by genus and create a list of unique assays for each genus
-    co_occurrence = processed_df.groupby('genus')['assay'].apply(list)
-    co_occurrence = co_occurrence.reset_index(name='assay')
+    # Group traits by microbe and create a list of unique traits for each microbe
+    co_occurrence = processed_df.groupby('microbe')['trait'].apply(list)
+    co_occurrence = co_occurrence.reset_index(name='trait')
 
-    # Remove duplicates from the list of assays for each genus
-    co_occurrence['assay'] = [list(set(g)) for g in co_occurrence['assay']]
+    # Remove duplicates from the list of traits for each microbe
+    co_occurrence['trait'] = [list(set(g)) for g in co_occurrence['trait']]
 
-    # Calculate the count of unique assays for each genus
-    co_occurrence['count'] = [len(g) for g in co_occurrence['assay']]
+    # Calculate the count of unique traits for each microbe
+    co_occurrence['count'] = [len(g) for g in co_occurrence['trait']]
 
-    # Sort the DataFrame by the count of unique assays in descending order
+    # Sort the DataFrame by the count of unique traits in descending order
     co_occurrence = co_occurrence.sort_values(by='count', ascending=False)
 
     return co_occurrence
 
 
-def get_assay_co_lookup(processed_df):
+def get_trait_co_lookup(processed_df):
     """
-    Get co-occurrence lookup for assays and associated genera from the processed DataFrame.
+    Get co-occurrence lookup for traits and associated microbes from the processed DataFrame.
 
     Parameters:
-        processed_df (DataFrame): A DataFrame containing processed tree data for assays and genera.
+        processed_df (DataFrame): A DataFrame containing processed tree data for traits and microbes.
 
     Returns:
-        dict: A dictionary containing the co-occurrence lookup for assays and their associated genera.
-              The dictionary has assays as keys and lists of associated genera as values.
+        dict: A dictionary containing the co-occurrence lookup for traits and their associated microbes.
+              The dictionary has traits as keys and lists of associated microbes as values.
     """
-    # Group genera by assay and create a list of associated genera for each assay
-    b_co = processed_df.groupby('assay')['genus'].apply(list).reset_index(name='genus').set_index('assay')
+    # Group microbes by trait and create a list of associated microbes for each trait
+    b_co = processed_df.groupby('trait')['microbe'].apply(list).reset_index(name='microbe').set_index('trait')
 
     # Convert the DataFrame to a dictionary for easy lookup
-    b_co_lookup = b_co['genus'].to_dict()
+    b_co_lookup = b_co['microbe'].to_dict()
 
     return b_co_lookup
 
 
 def find_co(source, target, b_co_lookup):
     """
-    Find assays where both the given source and target genera co-occur.
+    Find traits where both the given source and target microbes co-occur.
 
     Parameters:
-        source (str): The name of the source genus.
-        target (str): The name of the target genus.
-        b_co_lookup (dict): A dictionary containing the co-occurrence lookup for assays and their associated genera.
+        source (str): The name of the source microbe.
+        target (str): The name of the target microbe.
+        b_co_lookup (dict): A dictionary containing the co-occurrence lookup for traits and their associated microbes.
 
     Returns:
-        list: A list of assays where both the source and target genera co-occur.
+        list: A list of traits where both the source and target microbes co-occur.
     """
     co_list = []
-    for assay in b_co_lookup.keys():
-        g = b_co_lookup[assay]
+    for trait in b_co_lookup.keys():
+        g = b_co_lookup[trait]
         if (source in g) and (target in g):
-            co_list.append(assay)
+            co_list.append(trait)
     return co_list
 
 
 def get_stack(processed_df):
     """
-    Generate a DataFrame representing the co-occurrence count of genera across assays.
+    Generate a DataFrame representing the co-occurrence count of microbes across traits.
 
     Parameters:
-        processed_df (DataFrame): A DataFrame containing processed tree data for assays and genera.
+        processed_df (DataFrame): A DataFrame containing processed tree data for traits and microbes.
 
     Returns:
-        DataFrame: A DataFrame containing the co-occurrence count of genera across assays.
-                   The DataFrame has columns 'source', 'target', 'count', and 'assays'.
-                   'source' and 'target' represent the genera that co-occur across assays.
-                   'count' represents the number of assays in which the genera co-occur.
-                   'assays' contains the list of assays where the genera co-occur.
+        DataFrame: A DataFrame containing the co-occurrence count of microbes across traits.
+                   The DataFrame has columns 'source', 'target', 'count', and 'traits'.
+                   'source' and 'target' represent the microbes that co-occur across traits.
+                   'count' represents the number of traits in which the microbes co-occur.
+                   'traits' contains the list of traits where the microbes co-occur.
     """
-    genera_list = list(processed_df.groupby('assay')['genus'].apply(list).reset_index(name='genus')['genus'])
-    genera_list = [list(set(l)) for l in genera_list]
-    u = (pd.get_dummies(pd.DataFrame(genera_list), prefix='', prefix_sep='')
+    microbes_list = list(processed_df.groupby('trait')['microbe'].apply(list).reset_index(name='microbe')['microbe'])
+    microbes_list = [list(set(l)) for l in microbes_list]
+    u = (pd.get_dummies(pd.DataFrame(microbes_list), prefix='', prefix_sep='')
        .groupby(level=0, axis=1)
        .sum())
 
@@ -1246,8 +1246,8 @@ def get_stack(processed_df):
     stack = stack.rename(columns={'level_0':'source', 'level_1':'target', 0:'count'}).sort_values(by='count', ascending=False)
     stack = stack[stack['count']>0]
 
-    # Find assays where each source and target genera co-occur
-    stack['assays'] = [find_co(source, target) for source, target in zip(stack['source'], stack['target'])]
+    # Find traits where each source and target microbes co-occur
+    stack['traits'] = [find_co(source, target) for source, target in zip(stack['source'], stack['target'])]
 
     # Save the DataFrame to CSV and pickle files
     stack.to_csv('edgelist.csv', index=False)
@@ -1258,26 +1258,26 @@ def get_stack(processed_df):
 
 def get_lookup(single_tree):
     """
-    Generate a lookup dictionary for nodes in a single decision tree.
+    Generate a lookup dictionary for groups in a single decision tree.
 
     Parameters:
         single_tree (DataFrame): A DataFrame containing data for a single decision tree.
 
     Returns:
-        dict: A lookup dictionary where the keys are node numbers (node_n) and the values are dictionaries
-              containing information about each node.
-              Each node dictionary contains the following keys:
-                - 'color': The color associated with the node in visualizations.
-                - 'nobs': The number of observations (mice) in the node.
-                - 'y_mean': The mean value of the assay ranknorm associated with the node.
-                - 'err': The error value associated with the node.
-                - 'splitting_on': The genus that the node is splitting on. For leaf nodes, it is 'LEAF'.
-                - 'label_short': A short label for the node, suitable for visualization.
-                - 'label_long': A longer label for the node, suitable for tooltips in visualizations.
+        dict: A lookup dictionary where the keys are group numbers (group_n) and the values are dictionaries
+              containing information about each group.
+              Each group dictionary contains the following keys:
+                - 'color': The color associated with the group in visualizations.
+                - 'nobs': The number of observations (mice) in the group.
+                - 'y_mean': The mean value of the trait ranknorm associated with the group.
+                - 'err': The error value associated with the group.
+                - 'splitting_on': The microbe that the group is splitting on. For leaf groups, it is 'LEAF'.
+                - 'label_short': A short label for the group, suitable for visualization.
+                - 'label_long': A longer label for the group, suitable for tooltips in visualizations.
     """
-    lookup = single_tree.set_index('node_n').to_dict(orient='index')
+    lookup = single_tree.set_index('group_n').to_dict(orient='index')
 
-    # Add information for root node and any node without children (leaves)
+    # Add information for root group and any group without children (leaves)
     for n in [0, 1]:
         lookup[n] = {
             'color': 'black',
@@ -1286,21 +1286,21 @@ def get_lookup(single_tree):
             'err': None  # Update with the actual error value
         }
 
-    for node_n in lookup.keys():
-        children = single_tree[single_tree['parent'] == node_n]
+    for group_n in lookup.keys():
+        children = single_tree[single_tree['parent'] == group_n]
         if children.shape[0] > 0:
-            splitting_on = list(children['genus'])[0][3:]
+            splitting_on = list(children['microbe'])[0][3:]
         else:
             splitting_on = 'LEAF'
 
-        lookup[node_n]['splitting_on'] = splitting_on
+        lookup[group_n]['splitting_on'] = splitting_on
 
         if splitting_on == 'LEAF':
-            lookup[node_n]['label_short'] = f"Cohort {node_n}"
-            lookup[node_n]['label_long'] = f'Node {node_n} has {lookup[node_n]["nobs"]} mice<br />with a mean {list(single_tree["assay"])[0].replace("_ranknorm","")} of<br />{lookup[node_n]["y_mean"]}<extra></extra>'
+            lookup[group_n]['label_short'] = f"Cohort {group_n}"
+            lookup[group_n]['label_long'] = f'Group {group_n} has {lookup[group_n]["nobs"]} mice<br />with a mean {list(single_tree["trait"])[0].replace("_ranknorm","")} of<br />{lookup[group_n]["y_mean"]}<extra></extra>'
         else:
-            lookup[node_n]['label_short'] = splitting_on.replace('g__', '').replace('_', ' ')
-            lookup[node_n]['label_long'] = f'Node {node_n} has {lookup[node_n]["nobs"]} mice<br />and is splitting on {splitting_on}<extra></extra>'
+            lookup[group_n]['label_short'] = splitting_on.replace('g__', '').replace('_', ' ')
+            lookup[group_n]['label_long'] = f'Group {group_n} has {lookup[group_n]["nobs"]} mice<br />and is splitting on {splitting_on}<extra></extra>'
 
     return lookup
 
@@ -1311,7 +1311,7 @@ def make_network(selected):
     Create a network visualization for tree co-occurrence.
 
     Parameters:
-        selected (str): The selected genus to visualize tree co-occurrence.
+        selected (str): The selected microbe to visualize tree co-occurrence.
 
     Returns:
         plotly.graph_objs._figure.Figure: A Plotly figure object representing the network visualization.
@@ -1319,30 +1319,30 @@ def make_network(selected):
     # Load the pre-processed edgelist data
     stack = pd.read_pickle('edgelist.pkl').rename(columns={'count': 'weight'})
 
-    # Calculate the sizes of the nodes based on their weights
+    # Calculate the sizes of the groups based on their weights
     sizes = stack.groupby('source').sum().sort_values(by='weight', ascending=False)['weight'].to_dict()
 
     # Create a graph using networkx from the edgelist data
-    G = nx.from_pandas_edgelist(stack, "source", "target", ["weight", "assays"])
+    G = nx.from_pandas_edgelist(stack, "source", "target", ["weight", "traits"])
 
-    # Perform spring layout algorithm on the graph to get positions of nodes
+    # Perform spring layout algorithm on the graph to get positions of groups
     pos = nx.spring_layout(G, weight='weight', seed=7)
 
     # Initialize a list to store edge traces
     edge_traces = []
 
-    # Filter the edgelist data to include only the edges connected to the selected genus
+    # Filter the edgelist data to include only the edges connected to the selected microbe
     subset = stack[stack['source'] == selected]
 
     # Iterate over all edges in the graph
     for edge in G.edges.data():
         # Get the weight of the edge
         weight = edge[2]['weight']
-        # Set color for the edge based on whether the selected genus is connected to it
+        # Set color for the edge based on whether the selected microbe is connected to it
         if selected in [edge[0], edge[1]]:
-            color = "red"  # Selected genus connected
+            color = "red"  # Selected microbe connected
         else:
-            color = f'rgba(0,0,0,{weight*0.01})'  # Non-selected genus connected with transparency based on weight
+            color = f'rgba(0,0,0,{weight*0.01})'  # Non-selected microbe connected with transparency based on weight
 
         # Create a trace for the edge
         trace = go.Scatter(
@@ -1354,35 +1354,35 @@ def make_network(selected):
         )
         edge_traces.append(trace)
 
-    # Initialize lists to store node positions, names, sizes, and colors
-    node_x = []
-    node_y = []
-    node_name = []
-    node_sizes = []
-    node_colors = []
+    # Initialize lists to store group positions, names, sizes, and colors
+    group_x = []
+    group_y = []
+    group_name = []
+    group_sizes = []
+    group_colors = []
 
-    # Iterate over all nodes in the graph
-    for node in G.nodes():
-        node_x.append(pos[node][0])  # X position
-        node_y.append(pos[node][1])  # Y position
-        node_name.append(node)  # Node name
-        node_sizes.append(np.sqrt(sizes[node]))  # Size of the node
-        # Set node color based on whether the node is connected to the selected genus or not
-        node_colors.append('red' if node in list(subset['target']) else 'black' if node == selected else '#ddd')
+    # Iterate over all groups in the graph
+    for group in G.groups():
+        group_x.append(pos[group][0])  # X position
+        group_y.append(pos[group][1])  # Y position
+        group_name.append(group)  # Group name
+        group_sizes.append(np.sqrt(sizes[group]))  # Size of the group
+        # Set group color based on whether the group is connected to the selected microbe or not
+        group_colors.append('red' if group in list(subset['target']) else 'black' if group == selected else '#ddd')
 
-    # Create a scatter trace for nodes
-    node_trace = go.Scatter(
-        x=node_x, y=node_y,
+    # Create a scatter trace for groups
+    group_trace = go.Scatter(
+        x=group_x, y=group_y,
         mode='markers',
-        text=node_name,
+        text=group_name,
         hoverinfo='text',
-        marker=dict(size=node_sizes, color=node_colors)
+        marker=dict(size=group_sizes, color=group_colors)
     )
 
-    # Create the figure with edge traces and node trace
-    fig = go.Figure(data=edge_traces + [node_trace],
+    # Create the figure with edge traces and group trace
+    fig = go.Figure(data=edge_traces + [group_trace],
                     layout=go.Layout(
-                        title=f'Tree Co-Occurrence for {selected if selected else "all genera"}',
+                        title=f'Tree Co-Occurrence for {selected if selected else "all microbes"}',
                         titlefont_size=16,
                         showlegend=False,
                         hovermode='closest',
@@ -1395,10 +1395,10 @@ def make_network(selected):
 
 def make_related_bar(selected):
     """
-    Create a bar plot representing genera related to the selected genus by the number of trees they co-occur in.
+    Create a bar plot representing microbes related to the selected microbe by the number of trees they co-occur in.
 
     Parameters:
-        selected (str): The selected genus for which related genera are visualized.
+        selected (str): The selected microbe for which related microbes are visualized.
 
     Returns:
         plotly.graph_objs._figure.Figure: A Plotly figure object representing the bar plot.
@@ -1406,88 +1406,88 @@ def make_related_bar(selected):
     # Load the pre-processed edgelist data
     stack = pd.read_pickle('edgelist.pkl').rename(columns={'count': 'weight'})
 
-    # Filter the edgelist data to include only the edges connected to the selected genus
+    # Filter the edgelist data to include only the edges connected to the selected microbe
     subset = stack[stack['source'] == selected].sort_values(by='weight')
 
     # Create a bar plot using Plotly
     fig = px.bar(subset, x='target', y='weight')
 
-    # Set the hover template to display the number of trees the genera co-occur with the selected genus
+    # Set the hover template to display the number of trees the microbes co-occur with the selected microbe
     fig.update_traces(hovertemplate='%{x} co-occurs with<br>' + selected + ' in %{y} trees')
 
     fig.update_layout(template="plotly_white",
-                      title=f'Genera related to {selected}<br>by Number of Trees',
+                      title=f'Microbes related to {selected}<br>by Number of Trees',
                       clickmode='event+select'
                       )
     fig.update_xaxes(title='Related gene')
     fig.update_yaxes(title='Number of Trees')
     return fig
 
-def make_sankey(assay, tree):
+def make_sankey(trait, tree):
     """
-    Create a Sankey diagram representing the conditional inference tree for the specified assay.
+    Create a Sankey diagram representing the conditional inference tree for the specified trait.
 
     Parameters:
-        assay (str): The assay for which the conditional inference tree is visualized.
-        tree (pd.DataFrame): The processed DataFrame containing information about the tree nodes.
+        trait (str): The trait for which the conditional inference tree is visualized.
+        tree (pd.DataFrame): The processed DataFrame containing information about the tree groups.
 
     Returns:
         plotly.graph_objs._figure.Figure: A Plotly figure object representing the Sankey diagram.
     """
-    # Get the single tree for the specified assay
-    single_tree = get_tree(assay, tree)
+    # Get the single tree for the specified trait
+    single_tree = get_tree(trait, tree)
 
-    # Get the lookup dictionary for node information
+    # Get the lookup dictionary for group information
     lookup = get_lookup(single_tree)
 
-    # Create a list of labels for nodes in the Sankey diagram
-    labels = list(range(0, max(single_tree['node_n']) + 1))
+    # Create a list of labels for groups in the Sankey diagram
+    labels = list(range(0, max(single_tree['group_n']) + 1))
 
     # Create a Sankey diagram using Plotly
     fig = go.Figure(data=[go.Sankey(
         # arrangement='snap',
-        node=dict(
+        group=dict(
             pad=15,
             thickness=20,
             line=dict(color=[lookup[l]['color'] for l in labels], width=0.5),
             label=[lookup[l]['label_short'] for l in labels],
             customdata=[lookup[l]['label_long'] for l in labels],
-            hovertemplate='%{customdata}',  # Set custom hover template for nodes
+            hovertemplate='%{customdata}',  # Set custom hover template for groups
             color=[lookup[l]['color'] for l in labels],
         ),
         link=dict(
             arrowlen=15,
             source=single_tree['parent'],  # Indices correspond to labels, e.g., A1, A2, A1, B1, ...
-            target=single_tree['node_n'],
+            target=single_tree['group_n'],
             value=single_tree['nobs'],
             customdata=[f'{g[3:]} {s} {sv}' for s, sv, g in
-                        zip(single_tree['split'], single_tree['split_value'], single_tree['genus'])],
+                        zip(single_tree['split'], single_tree['split_value'], single_tree['microbe'])],
             hovertemplate='There are %{value} mice in this branch<br />with %{customdata}'
         ))])
 
-    fig.update_layout(title_text=f"Conditional Inference Tree for {assay.replace('_ranknorm', '')}", font_size=10)
+    fig.update_layout(title_text=f"Conditional Inference Tree for {trait.replace('_ranknorm', '')}", font_size=10)
     return fig
 
 
 
 def make_pcoord(reference, tree):
     """
-    Generate a parallel coordinates plot based on the reference (assay or genus) data.
+    Generate a parallel coordinates plot based on the reference (trait or microbe) data.
 
     Parameters:
-        reference (str): The reference (assay or genus) for which the parallel coordinates plot is generated.
-        tree (pd.DataFrame): The processed DataFrame containing information about the tree nodes.
+        reference (str): The reference (trait or microbe) for which the parallel coordinates plot is generated.
+        tree (pd.DataFrame): The processed DataFrame containing information about the tree groups.
 
     Returns:
         plotly.graph_objs._figure.Figure: A Plotly figure object representing the parallel coordinates plot.
     """
-    # Load assay and abundance data
-    assay_data = read_assay()[0]
+    # Load trait and abundance data
+    trait_data = read_trait()[0]
     abundance_data = read_abundance()[0]
 
-    # Check if the reference is a genus or assay
+    # Check if the reference is a microbe or trait
     if 'g__' in reference:
-        # If it is a genus, create a DataFrame with abundance data for the given genus
+        # If it is a microbe, create a DataFrame with abundance data for the given microbe
         df = get_abundance_df(reference)
         # Set the color for the parallel coordinates plot to the second column of the DataFrame
         color = df.columns[1]
@@ -1496,33 +1496,33 @@ def make_pcoord(reference, tree):
         # labels = [{d:d.replace('_batch_ranknorm','')} for d in dims]
         # print(labels)
     else:
-        # If it is a assay, create a DataFrame with assay data for the given assay
-        df = get_assay_df(reference, abundance_data=abundance_data)
-        # Get the tree for the given assay
+        # If it is a trait, create a DataFrame with trait data for the given trait
+        df = get_trait_df(reference, abundance_data=abundance_data)
+        # Get the tree for the given trait
         single_tree = get_tree(reference, tree)
-        # Determine the order of genera for the Sankey diagram based on the tree
+        # Determine the order of microbes for the Sankey diagram based on the tree
         sankey_order = []
-        for g in list(single_tree['genus']):
+        for g in list(single_tree['microbe']):
             if g not in sankey_order:
                 sankey_order.append(g)
         # print(sankey_order)
         # print(list(df.columns.values))
-        # Filter the DataFrame to include only the genera specified in the Sankey diagram order
+        # Filter the DataFrame to include only the microbes specified in the Sankey diagram order
         df = df[sankey_order]
-        # Add the assay column to the DataFrame
-        df[reference] = list(assay_data.filter(items=[reference])[reference])
+        # Add the trait column to the DataFrame
+        df[reference] = list(trait_data.filter(items=[reference])[reference])
         # Reset the index of the DataFrame and drop the old index column
         df = df.reset_index().drop(columns=['index'])
         # Convert all columns to numeric values, ignoring non-numeric entries
         df = df.apply(pd.to_numeric, errors='coerce')
-        # Set the color for the parallel coordinates plot to the reference assay
+        # Set the color for the parallel coordinates plot to the reference trait
         color = reference
-        # Get the list of dimensions (genera and assay) for labeling purposes
+        # Get the list of dimensions (microbes and trait) for labeling purposes
         dims = list(df.columns)
         # Create a dictionary to map dimensions to their corresponding labels for the plot
         labels = {}
         for d in dims:
-            labels[d] = d.replace('g__', '').replace(reference, 'assay')
+            labels[d] = d.replace('g__', '').replace(reference, 'trait')
         # print(labels)
 
     # Create the parallel coordinates plot using Plotly
