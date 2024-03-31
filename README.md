@@ -8,7 +8,7 @@ This dashboard is for visualizing the results of XAI trees on wide data. It was 
 
    ```
    git clone XXX
-   cd assay
+   cd XXX
    ```
 
 2. Install virtual env, then create and activate a virtual environment (optional but recommended):
