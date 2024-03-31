@@ -112,13 +112,12 @@ def create_arrow_plot():
     )
     return fig
 
-def create_grid_plot(feature, mice, df, trait, color_scale):
+def create_grid_plot(feature, mice, df, trait, color_scale, split, val):
     fig = go.Figure(
         go.Violin(x=df[feature], marker_color='lightgrey', showlegend=False, hoverinfo='skip',
                   points=False))
     subset = df[df['Mouse ID'].isin(mice)].copy()
     subset['jitter'] = [0.01 + np.random.normal(0, 0.05) for _ in range(len(subset[feature]))]
-    print(subset.filter(['Group ID', 'Mouse ID', 'color']))
     for i, row in subset.iterrows():
         fig.add_trace(
             px.strip([row], x=feature, hover_name="Mouse ID",
@@ -129,6 +128,14 @@ def create_grid_plot(feature, mice, df, trait, color_scale):
     fig.update_traces(offsetgroup=0)
     # Add a vertical line to show the mean value
     fig.add_vline(x=df[feature].mean(), line_dash="dash", line_color="#999")
+    fig.add_vline(x=val, line_color="red")
+    fig.add_annotation(
+        x=float(val)-30,
+        y=0.5,
+        text=f"{val}",
+        showarrow=False,
+        font=dict(size=20, color='red')
+    )
     fig.update_layout(template='plotly_white', width=200, height=100, showlegend=False)
     # zero out margins:
     fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
@@ -182,8 +189,10 @@ def grid_handler(grid, df, trait, color_scale):
                     config={'displayModeBar': False}
                     )], style=content_style))
             elif celldata['Type'] == 'Plot':
+                split = celldata['Split']
+                val = celldata['Value']
                 row_items.append(html.Div([dcc.Graph(
-                    figure=create_grid_plot(celldata['Feature'], celldata['Mouse IDs'], df, trait, color_scale),
+                    figure=create_grid_plot(celldata['Feature'], celldata['Mouse IDs'], df, trait, color_scale, split, val),
                     config={'displayModeBar': False}
                     )], style=content_style))
             else:

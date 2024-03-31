@@ -18,7 +18,23 @@ def aggregate_by_group(mice, trait, data_dir):
     groups.to_pickle(os.path.join(data_dir, trait, "groups.pkl"))
     return groups
 
-def get_grid_structure(groups):
+def parse_rules(trait, data_dir):
+    tree_rules = open(os.path.join(data_dir, trait, "rules.txt")).read()
+    rules_df = pd.DataFrame(columns=['Depth', 'Microbe', 'Split', 'Value'])
+    last_at_depth = {0: 'Root'}
+    for i, line in enumerate(tree_rules.split("\n")):
+        depth = line.count('|')
+        elements = line.split( )[depth:]
+        if len(elements) == 3:
+            if elements[0] != 'class:':
+                microbe, split, value = elements
+                rules_df.loc[i] = [depth, microbe, split, value]
+        last_at_depth[depth] = microbe
+    os.makedirs(os.path.join(data_dir, trait), exist_ok=True)
+    rules_df.to_csv(os.path.join(data_dir, trait, "rules.csv"), index=False)
+    return rules_df
+
+def get_grid_structure(groups, rules):
     groups_dict = groups.copy().to_dict(orient="index")
     cols = []
     group_names = groups_dict.keys()
@@ -31,10 +47,14 @@ def get_grid_structure(groups):
         end_branch = False
         row = []
         for feature in feature_names:
+            split = rules[rules["Microbe"]==feature]["Split"].values[0]
+            value = rules[rules["Microbe"]==feature]["Value"].values[0]
             if feature in data["Feature Path"]:
                 row.append({
                     "Type": "Plot",
                     "Feature": feature,
+                    "Split": split,
+                    "Value": value,
                     "Mouse IDs": data["Mouse IDs"],
                 })
                 if feature == data["Feature Path"][-1]:
@@ -44,12 +64,16 @@ def get_grid_structure(groups):
                     row.append({
                         "Type": "Empty",
                         "Feature": feature,
+                         "Split": split,
+                         "Value": value,
                         "Mouse IDs": [],
                     })
                 else:
                     row.append({
                         "Type": "Arrow",
                         "Feature": feature,
+                        "Split": split,
+                        "Value": value,
                         "Mouse IDs": [],
                     })
         cols.append(row)
@@ -75,7 +99,8 @@ def parse_data():
     for trait in folders:
         mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"))
         groups = aggregate_by_group(mice, trait, data_dir)
-        grid = get_grid_structure(groups)
+        rules = parse_rules(trait, data_dir)
+        grid = get_grid_structure(groups, rules)
         grid.to_pickle(os.path.join(data_dir, trait, "grid.pkl"))
 
 if __name__ == "__main__":
