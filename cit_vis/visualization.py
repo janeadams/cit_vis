@@ -10,37 +10,50 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from cit_vis.parse import get_edgelist, find_relevant
 
-def load_data():
+def load_data(debug=True):
+    if debug: print("Loading data...")
     dotenv.load_dotenv()
+    port = os.getenv("PORT")
+    if debug: print(f"PORT: {port}")
     data_dir = os.getenv("DATA_DIR")
+    if debug: print(f"DATA_DIR: {data_dir}")
     trait_df = pd.read_csv(os.path.join(data_dir, "trait_scores.csv"), index_col=0)
     traits = trait_df.columns
+    if debug: print(f"Found {len(traits)} Traits: {traits}")
     microbe_df = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
     microbes = microbe_df.columns
+    if debug: print(f"Found {len(microbes)} Microbes: {microbes}")
     df = pd.concat([trait_df, microbe_df], axis=1)
     df.reset_index(inplace=True)
     df.rename(columns={'index': 'Mouse ID'}, inplace=True)
-    return df, traits, microbes, data_dir
+    if debug: print(f"Found {len(df)} Mice: {df['Mouse ID'].values}")
+    return df, traits, microbes, data_dir, port
 
-def make_microbes_dropdown_options(microbes):
+def make_microbes_dropdown_options(microbes, debug=True):
+    if debug: print(f"Creating dropdown options for {len(microbes)} microbes...")
     microbes_dropdown_options = [{'label': microbe, 'value': microbe} for microbe in microbes]
     microbes_dropdown_options.insert(0, {'label': 'All', 'value': 'All'})
     return microbes_dropdown_options
 
-def make_traits_dropdown_options(traits):
+def make_traits_dropdown_options(traits, debug=True):
+    if debug: print(f"Creating dropdown options for {len(traits)} traits...")   
     trait_dropdown_options = [{'label': trait, 'value': trait} for trait in traits]
     return trait_dropdown_options
 
-def load_trait_specific_data(trait, data_dir, df):
+def load_trait_specific_data(trait, data_dir, df, debug=True):
+    if debug: print(f"Loading data for trait: {trait}")
     groups = pd.read_pickle(os.path.join(data_dir, trait, "groups.pkl"))
+    if debug: print(f"Found {len(groups)} groups for trait: {trait}")
     color_scale = create_color_scale(df[trait])
+    if debug: print(f"Loading grid for trait: {trait}...")
     grid = pd.read_pickle(os.path.join(data_dir, trait, "grid.pkl"))
+    if debug: print(f"Loading mouse data for trait: {trait}...")
     mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"), index_col=0).filter(["Group ID"], axis=1)
     group_ids = [mice.loc[mouse_id, 'Group ID'] for mouse_id in df['Mouse ID']]
     df['color'] = [get_color(value, color_scale) for value in df[trait]]
     return groups, grid, color_scale, group_ids
 
-def create_color_scale(vector):
+def create_color_scale(vector, debug=True):
     min_val = min(vector)
     max_val = max(vector)
     # Use Matplotlib's built-in 'coolwarm' colormap
@@ -50,13 +63,14 @@ def create_color_scale(vector):
     # Return both colormap and normalizer to apply on values
     return cmap, norm
 
-def get_color(value, color_scale):
+def get_color(value, color_scale, debug=True):
     cmap, norm = color_scale
     rgba_color = cmap(norm(value))
     # Convert RGBA to hexadecimal
     return mcolors.to_hex(rgba_color)
 
-def create_sankey_diagram(trait, data_dir, color_scale):
+def create_sankey_diagram(trait, data_dir, color_scale, debug=True):
+    if debug: print(f"Creating Sankey diagram for trait: {trait}")
     sankey_df = get_edgelist(trait, data_dir)
     labels = list(set(sankey_df['source'].values) | set(sankey_df['target'].values))
     # Look up the color for each node in the labels group:
@@ -80,7 +94,8 @@ def create_sankey_diagram(trait, data_dir, color_scale):
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
-def create_stripplot(df, trait, color_scale):
+def create_stripplot(df, trait, color_scale, debug=True):
+    if debug: print(f"Creating strip plot for trait: {trait}")
     # Order based on mean trait value for each Group ID:
     order = df.groupby('Group ID')[trait].mean().sort_values().index
     df['Group ID'] = pd.Categorical(df['Group ID'], categories=order, ordered=True)
@@ -95,7 +110,7 @@ def create_stripplot(df, trait, color_scale):
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
-def create_empty_plot():
+def create_empty_plot(debug=True):
     fig = go.Figure()
     fig.update_layout(template='plotly_white', width=200, height=100, showlegend=False)
     fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
@@ -103,7 +118,7 @@ def create_empty_plot():
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     return fig
 
-def create_arrow_plot():
+def create_arrow_plot(debug=True):
     fig = create_empty_plot()
     fig.add_annotation(
         x=0.5,
@@ -116,7 +131,7 @@ def create_arrow_plot():
     )
     return fig
 
-def create_grid_plot(feature, mice, df, trait, color_scale, split, val):
+def create_grid_plot(feature, mice, df, trait, color_scale, split, val, debug=True):
     fig = go.Figure(
         go.Violin(x=df[feature], marker_color='lightgrey', showlegend=False, hoverinfo='skip',
                   points=False))
@@ -147,7 +162,8 @@ def create_grid_plot(feature, mice, df, trait, color_scale, split, val):
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     return fig
 
-def grid_handler(grid, df, trait, color_scale):
+def grid_handler(grid, df, trait, color_scale, debug=True):
+    if debug: print("Creating grid...")
     grid_dict = grid.to_dict(orient='index')
     plot_grid = []
 
@@ -214,17 +230,15 @@ def grid_handler(grid, df, trait, color_scale):
 
     return plot_grid
 
-
-
-
-def make_dashboard():
-    df, traits, microbes, data_dir = load_data()
+def make_dashboard(debug=True):
+    if debug: print("Creating dashboard...")
+    df, traits, microbes, data_dir, port = load_data(debug=debug)
 
     selected_microbe = 'All'
     selected_trait = traits[0]
 
     # Things that update when the trait changes
-    groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df)
+    groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df, debug=debug)
 
     app = Dash(__name__)
 
@@ -252,20 +266,20 @@ def make_dashboard():
     app.layout = html.Div([
         html.H1("CIT Visualization"),
         html.Div([
-            html.Div([dcc.Dropdown(id='microbe-dropdown', options=make_microbes_dropdown_options(microbes), value=selected_microbe)],
+            html.Div([dcc.Dropdown(id='microbe-dropdown', options=make_microbes_dropdown_options(microbes, debug=debug), value=selected_microbe)],
                     style=dropdown_cell_style),
-            html.Div([dcc.Dropdown(id='trait-dropdown', options=make_traits_dropdown_options(traits), value=selected_trait)],
+            html.Div([dcc.Dropdown(id='trait-dropdown', options=make_traits_dropdown_options(traits, debug=debug), value=selected_trait)],
                     style=dropdown_cell_style),
         ], style=row_style),
 
         html.Div([
-            html.Div([dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(selected_trait, data_dir, color_scale), config={'displayModeBar': False})],
+            html.Div([dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(selected_trait, data_dir, color_scale, debug=debug), config={'displayModeBar': False})],
                     style=overview_cell_style),
-            html.Div([dcc.Graph(id='stripplot', figure=create_stripplot(df, selected_trait, color_scale), config={'displayModeBar': False})],
+            html.Div([dcc.Graph(id='stripplot', figure=create_stripplot(df, selected_trait, color_scale, debug=debug), config={'displayModeBar': False})],
                     style=overview_cell_style)
         ], style=row_style),
         
-        html.Div(id='grid-container', children=grid_handler(grid, df, selected_trait, color_scale), style=row_style),
+        html.Div(id='grid-container', children=grid_handler(grid, df, selected_trait, color_scale, debug=debug), style=row_style),
         dcc.Store(id='selected-trait', data=selected_trait)
     ], style={'width': '100%', 'margin': 'auto', 'padding': '20px', 'min-width': '1200px', 'font-family': 'Arial, sans-serif', 'color': '#333', 'background-color': '#ffffff'})
 
@@ -277,9 +291,10 @@ def make_dashboard():
          Input('selected-trait', 'data')]
     )
     def update_trait_dropdown(selected_microbe, selected_trait):
+        if debug: print(f"Updating trait dropdown for microbe: {selected_microbe}")
         if selected_microbe == 'All':
             return [{'label': trait, 'value': trait} for trait in traits], selected_trait
-        relevant_traits = find_relevant(selected_microbe, data_dir)
+        relevant_traits = find_relevant(selected_microbe, data_dir, debug=debug)
         if selected_trait not in relevant_traits:
             selected_trait = relevant_traits[0]
         return [{'label': trait, 'value': trait} for trait in relevant_traits], selected_trait
@@ -291,13 +306,14 @@ def make_dashboard():
         [Input('trait-dropdown', 'value')]
     )
     def update_charts(selected_trait):
-        groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df)
-        sankey = create_sankey_diagram(selected_trait, data_dir, color_scale)
-        stripplot = create_stripplot(df, selected_trait, color_scale)
-        grid = grid_handler(grid, df, selected_trait, color_scale)
+        if debug: print(f"Updating charts for trait: {selected_trait}")
+        groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df, debug=debug)
+        sankey = create_sankey_diagram(selected_trait, data_dir, color_scale, debug=debug)
+        stripplot = create_stripplot(df, selected_trait, color_scale, debug=debug)
+        grid = grid_handler(grid, df, selected_trait, color_scale, debug=debug)
         return sankey, stripplot, grid
 
-    app.run_server(debug=True)
+    app.run_server(debug=debug, port=port)
     
 if __name__ == "__main__":
-    make_dashboard()
+    make_dashboard(debug=True)

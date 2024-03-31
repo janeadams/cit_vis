@@ -3,10 +3,11 @@ import dotenv
 import pandas as pd
 import json
 
-def get_trait_folders(data_dir):
+def get_trait_folders(data_dir, debug=True):
     return [f for f in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, f))]
 
-def aggregate_by_group(mice, trait, data_dir):
+def aggregate_by_group(mice, trait, data_dir, debug=True):
+    if debug: print(f"Aggregating by group for {trait}...")
     groups = mice.groupby("Group ID").agg({
         "Mouse ID": lambda x: list(x),
         "Feature Path": "first",
@@ -17,9 +18,11 @@ def aggregate_by_group(mice, trait, data_dir):
     groups.sort_values("Mean Trait Value", ascending=False, inplace=True)
     groups.set_index("Group ID", inplace=True)
     groups.to_pickle(os.path.join(data_dir, trait, "groups.pkl"))
+    if debug: print(f"Groups saved to {os.path.join(data_dir, trait, 'groups.pkl')}.")
     return groups
 
-def get_grid_structure(groups, rules):
+def get_grid_structure(groups, rules, debug=True):
+    if debug: print("Creating grid structure...")
     groups_dict = groups.copy().to_dict(orient="index")
     cols = []
     group_names = groups_dict.keys()
@@ -63,9 +66,11 @@ def get_grid_structure(groups, rules):
                     })
         cols.append(row)
     grid = pd.DataFrame(cols, columns=feature_names, index=group_names).T
+    if debug: print("Grid structure created.")
     return grid
         
-def get_edgelist(trait, data_dir):
+def get_edgelist(trait, data_dir, debug=True):
+    if debug: print(f"Creating edgelist for {trait}...")
     rules = pd.read_csv(os.path.join(data_dir, trait, "rules.csv"))
     mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"))
     mice["Feature Path"] = mice["Feature Path"].apply(lambda x: x.split(" -> "))
@@ -99,31 +104,37 @@ def get_edgelist(trait, data_dir):
     edgelist = pd.DataFrame(edges)
     edgelist.sort_values("mean_trait", ascending=False, inplace=True)
     edgelist.to_csv(os.path.join(data_dir, trait, "edgelist.csv"), index=False)
+    if debug: print(f"Edgelist saved to {os.path.join(data_dir, trait, 'edgelist.csv')}.")
     return edgelist
 
-def find_relevant(microbe, data_dir):
+def find_relevant(microbe, data_dir, debug=True):
+    if debug: print(f"Finding relevant traits for {microbe}...")
     with open(os.path.join(data_dir, "relevance.json"), "r") as f:
-        relevance = json.load(f)
-    return relevance[microbe]
+        relevant = json.load(f)[microbe]
+    if debug: print(f"Relevant traits for {microbe}: {relevant}")
+    return relevant
 
-def parse_data():
+def parse_data(debug=True):
+    if debug: print("Parsing data...")
     dotenv.load_dotenv()
     data_dir = os.getenv("DATA_DIR")
-    folders = get_trait_folders(data_dir)
+    folders = get_trait_folders(data_dir, debug=debug)
     relevance = {}
     for trait in folders:
+        if debug: print(f"Parsing data for {trait}...")
         mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"))
-        groups = aggregate_by_group(mice, trait, data_dir)
+        groups = aggregate_by_group(mice, trait, data_dir, debug=debug)
         rules = pd.read_csv(os.path.join(data_dir, trait, "rules.csv"))
         for microbe in rules["Microbe"]:
             if microbe not in relevance.keys():
                 relevance[microbe] = [trait]
             else:
                 relevance[microbe].append(trait)
-        grid = get_grid_structure(groups, rules)
+        grid = get_grid_structure(groups, rules, debug=debug)
         grid.to_pickle(os.path.join(data_dir, trait, "grid.pkl"))
     with open(os.path.join(data_dir, "relevance.json"), "w") as f:
         json.dump(relevance, f)
+    if debug: print(f"Data parsed. Saved relevance to {os.path.join(data_dir, 'relevance.json')}.")
 
 if __name__ == "__main__":
     parse_data()

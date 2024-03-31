@@ -5,7 +5,8 @@ import dotenv
 from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.model_selection import train_test_split
 
-def make_data():
+def make_data(debug=True):
+    print("Generating data...")
     # Load environment variables
     dotenv.load_dotenv()
 
@@ -17,6 +18,7 @@ def make_data():
     num_mice = int(os.getenv("NUM_MICE", 50))
     num_traits = int(os.getenv("NUM_TRAITS", 30))
     num_microbes = int(os.getenv("NUM_MICROBES", 30))
+    if debug: print(f"Generating data for {num_mice} mice, {num_traits} traits, and {num_microbes} microbes.")
 
     # Generate names for mice, traits, and microbes
     mice_names = [f"Mouse{i+1}" for i in range(num_mice)]
@@ -24,12 +26,14 @@ def make_data():
     microbes_names = [f"Microbe{i+1}" for i in range(num_microbes)]
 
     # Generate baseline microbe abundances
+    if debug: print("Generating baseline microbe abundances...")
     microbe_abundances = {mouse: {microbe: np.random.normal(100, 20) for microbe in microbes_names} for mouse in mice_names}
 
     # Map microbes to traits based on importance
     microbe_trait_importance = {microbe: np.random.choice(traits_names, size=np.random.randint(1, 5), replace=False).tolist() for microbe in microbes_names}
 
     # Generate trait scores influenced by microbes
+    if debug: print("Generating trait scores influenced by microbes...")
     trait_scores = pd.DataFrame(columns=traits_names, index=mice_names)
     for mouse in mice_names:
         for trait in traits_names:
@@ -40,7 +44,9 @@ def make_data():
     # Convert microbe abundances to DataFrame and save
     microbe_abundances_df = pd.DataFrame(microbe_abundances).T
     trait_scores.to_csv(os.path.join(data_dir, "trait_scores.csv"))
+    if debug: print(f"Trait scores saved to {os.path.join(data_dir, 'trait_scores.csv')}.")
     microbe_abundances_df.to_csv(os.path.join(data_dir, "microbe_abundances.csv"))
+    if debug: print(f"Microbe abundances saved to {os.path.join(data_dir, 'microbe_abundances.csv')}.")
 
     # Load data
     original_trait_scores_df = pd.read_csv(os.path.join(data_dir, "trait_scores.csv"), index_col=0)
@@ -63,6 +69,7 @@ def make_data():
 
     # Decision Tree Classifier to analyze categorical trait scores
     for trait in trait_scores_df.columns:
+        if debug: print(f"Running decision tree for trait '{trait}'...")
         os.makedirs(os.path.join(data_dir, trait), exist_ok=True)
         X = microbe_abundances_df
         y = trait_scores_df[trait]
@@ -124,6 +131,7 @@ def make_data():
         results_df['Feature Path'] = feature_paths_list
 
         results_df.to_csv(os.path.join(data_dir, trait, "mice.csv"), index=False)
+        if debug: print(f"Results saved to {os.path.join(data_dir, trait, 'mice.csv')}.")
 
         # Extract rules using export_text
         tree_rules = export_text(clf, feature_names=list(X.columns))
@@ -131,6 +139,8 @@ def make_data():
         # Save rules to a text file
         with open(os.path.join(data_dir, trait, "rules.txt"), "w") as text_file:
             text_file.write(tree_rules)
+
+        if debug: print(f"Simple human-readable rules saved to {os.path.join(data_dir, trait, 'rules.txt')}.")
 
         def parse_rules(trait, data_dir, clf, X):
             node_samples = clf.tree_.n_node_samples
@@ -163,6 +173,7 @@ def make_data():
             return rules_df
         
         rules_df = parse_rules(trait, data_dir, clf, X)
+        if debug: print(f"Rules dataframe saved to {os.path.join(data_dir, trait, 'rules.csv')}.")
 
 if __name__ == "__main__":
-    make_data()
+    make_data(debug=True)
