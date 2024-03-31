@@ -11,18 +11,31 @@ import matplotlib.colors as mcolors
 from cit_vis.parse import get_edgelist, find_relevant
 
 def load_data(debug=True):
+    """Load the data from the data directory.
+
+    Args:
+        debug (bool): Whether to print debug statements.
+
+    Returns:
+        tuple: A tuple containing the data DataFrame, traits, microbes, data directory, and port.
+    """
+    # Load environment variables
     if debug: print("Loading data...")
     dotenv.load_dotenv()
     port = os.getenv("PORT")
     if debug: print(f"PORT: {port}")
     data_dir = os.getenv("DATA_DIR")
     if debug: print(f"DATA_DIR: {data_dir}")
+
+    # Load the experimental data
     trait_df = pd.read_csv(os.path.join(data_dir, "trait_scores.csv"), index_col=0)
     traits = trait_df.columns
     if debug: print(f"Found {len(traits)} Traits: {traits}")
     microbe_df = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
     microbes = microbe_df.columns
     if debug: print(f"Found {len(microbes)} Microbes: {microbes}")
+
+    # Combine the trait and microbe data
     df = pd.concat([trait_df, microbe_df], axis=1)
     df.reset_index(inplace=True)
     df.rename(columns={'index': 'Mouse ID'}, inplace=True)
@@ -30,17 +43,51 @@ def load_data(debug=True):
     return df, traits, microbes, data_dir, port
 
 def make_microbes_dropdown_options(microbes, debug=True):
+    """Create the dropdown options for the microbes.
+
+    Args:
+        microbes (list): The list of microbes.
+        debug (bool): Whether to print debug statements.
+
+    Returns:
+        list: The dropdown options for the microbes.
+    """
     if debug: print(f"Creating dropdown options for {len(microbes)} microbes...")
+
+    # Create the dropdown options
     microbes_dropdown_options = [{'label': microbe, 'value': microbe} for microbe in microbes]
+
+    # Add an option to select all microbes
     microbes_dropdown_options.insert(0, {'label': 'All', 'value': 'All'})
     return microbes_dropdown_options
 
 def make_traits_dropdown_options(traits, debug=True):
+    """Create the dropdown options for the traits.
+    
+    Args:
+        traits (list): The list of traits.
+        debug (bool): Whether to print debug statements.
+        
+        Returns:
+        list: The dropdown options for the traits.
+    """
     if debug: print(f"Creating dropdown options for {len(traits)} traits...")   
+
+    # Create the dropdown options
     trait_dropdown_options = [{'label': trait, 'value': trait} for trait in traits]
     return trait_dropdown_options
 
 def load_trait_specific_data(trait, data_dir, df, debug=True):
+    """Load the data specific to the selected trait.
+
+    Args:
+        trait (str): The selected trait.
+        data_dir (str): The path to the data directory.
+        df (DataFrame): The data DataFrame.
+
+    Returns:
+        tuple: A tuple containing the groups, grid, color scale, and group IDs.
+    """
     if debug: print(f"Loading data for trait: {trait}")
     groups = pd.read_pickle(os.path.join(data_dir, trait, "groups.pkl"))
     if debug: print(f"Found {len(groups)} groups for trait: {trait}")
@@ -54,6 +101,15 @@ def load_trait_specific_data(trait, data_dir, df, debug=True):
     return groups, grid, color_scale, group_ids
 
 def create_color_scale(vector, debug=True):
+    """Create a color scale for the vector.
+    
+    Args:
+        vector (list): The vector to create a color scale for.
+        debug (bool): Whether to print debug statements.
+        
+    Returns:
+        tuple: A tuple containing the colormap and normalizer.
+    """
     min_val = min(vector)
     max_val = max(vector)
     # Use Matplotlib's built-in 'coolwarm' colormap
@@ -64,12 +120,31 @@ def create_color_scale(vector, debug=True):
     return cmap, norm
 
 def get_color(value, color_scale, debug=True):
+    """Get the color for the value.
+    
+    Args:
+        value (float): The value to get the color for.
+        color_scale (tuple): The color scale tuple.
+        
+    Returns:
+        str: The color for the value.
+    """
     cmap, norm = color_scale
     rgba_color = cmap(norm(value))
     # Convert RGBA to hexadecimal
     return mcolors.to_hex(rgba_color)
 
 def create_sankey_diagram(trait, data_dir, color_scale, debug=True):
+    """Create a Sankey diagram for the trait.
+
+    Args:
+        trait (str): The trait to create a Sankey diagram for.
+        data_dir (str): The path to the data directory.
+        color_scale (tuple): The color scale tuple.
+
+    Returns:
+        go.Figure: The Sankey diagram for the trait.
+    """
     if debug: print(f"Creating Sankey diagram for trait: {trait}")
     sankey_df = get_edgelist(trait, data_dir)
     labels = list(set(sankey_df['source'].values) | set(sankey_df['target'].values))
@@ -95,22 +170,44 @@ def create_sankey_diagram(trait, data_dir, color_scale, debug=True):
     return fig
 
 def create_stripplot(df, trait, color_scale, debug=True):
+    """"Create a strip plot for the trait.
+
+    Args:
+        df (DataFrame): The data DataFrame.
+        trait (str): The trait to create a strip plot for.
+        color_scale (tuple): The color scale tuple.
+
+    Returns:
+        go.Figure: The strip plot for the trait.
+    """
     if debug: print(f"Creating strip plot for trait: {trait}")
+
     # Order based on mean trait value for each Group ID:
     order = df.groupby('Group ID')[trait].mean().sort_values().index
     df['Group ID'] = pd.Categorical(df['Group ID'], categories=order, ordered=True)
+
     # Assign a color to each group
     color_lookup = dict(zip(df['Mouse ID'], df['color']))
     fig = px.strip(df, x='Group ID', y=trait, color='Mouse ID', color_discrete_map=color_lookup)
     fig.update_layout(template='plotly_white', showlegend=False)
+
     # Add a dark gray stroke to the strip plot points:
     fig.update_traces(marker=dict(size=10, line=dict(width=2, color='DarkSlateGray')))
+
     # On hover, show the mouse ID and the trait score
     fig.update_traces(hovertemplate=trait+': %{y:.2f}')
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
 def create_empty_plot(debug=True):
+    """Create an empty plot.
+
+    Args:
+        debug (bool): Whether to print debug statements.
+    
+    Returns:
+        go.Figure: The empty plot.
+    """
     fig = go.Figure()
     fig.update_layout(template='plotly_white', width=200, height=100, showlegend=False)
     fig.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
@@ -119,6 +216,14 @@ def create_empty_plot(debug=True):
     return fig
 
 def create_arrow_plot(debug=True):
+    """Create an arrow plot.
+
+    Args:
+        debug (bool): Whether to print debug statements.
+
+    Returns:
+        go.Figure: The arrow plot.
+    """
     fig = create_empty_plot()
     fig.add_annotation(
         x=0.5,
@@ -132,6 +237,20 @@ def create_arrow_plot(debug=True):
     return fig
 
 def create_grid_plot(feature, mice, df, trait, color_scale, split, val, debug=True):
+    """Create a grid plot for the feature.
+
+    Args:
+        feature (str): The feature to create a grid plot for.
+        mice (list): The list of mice.
+        df (DataFrame): The DataFrame for the experimental data.
+        trait (str): The trait to create a grid plot for.
+        color_scale (tuple): The color scale tuple.
+        split (str): The split for the feature.
+        val (float): The value for the split.
+
+    Returns:
+        go.Figure: The grid plot for the feature.
+    """
     fig = go.Figure(
         go.Violin(x=df[feature], marker_color='lightgrey', showlegend=False, hoverinfo='skip',
                   points=False))
@@ -163,6 +282,18 @@ def create_grid_plot(feature, mice, df, trait, color_scale, split, val, debug=Tr
     return fig
 
 def grid_handler(grid, df, trait, color_scale, debug=True):
+    """Handle the grid for the trait.
+    
+    Args:
+        grid (DataFrame): The grid for the trait.
+        df (DataFrame): The DataFrame for the experimental data.
+        trait (str): The trait to create the grid for.
+        color_scale (tuple): The color scale tuple.
+        debug (bool): Whether to print debug statements.
+        
+    Returns:
+        html.Div: The grid container for the trait.
+    """
     if debug: print("Creating grid...")
     grid_dict = grid.to_dict(orient='index')
     plot_grid = []
@@ -230,7 +361,16 @@ def grid_handler(grid, df, trait, color_scale, debug=True):
 
     return plot_grid
 
-def make_dashboard(debug=True):
+def make_dashboard(debug=True, port=8050):
+    """Create the dashboard and launch it
+    
+    Args:
+        debug (bool): Whether to print debug statements.
+        port (int): The port to run the dashboard on.
+        
+    Returns:
+        None
+    """
     if debug: print("Creating dashboard...")
     df, traits, microbes, data_dir, port = load_data(debug=debug)
 
@@ -262,7 +402,7 @@ def make_dashboard(debug=True):
         'height': '200px'
     })
 
-    # Define the layout with improved structure and styling
+    # Define the layout
     app.layout = html.Div([
         html.H1("CIT Visualization"),
         html.Div([
@@ -283,7 +423,7 @@ def make_dashboard(debug=True):
         dcc.Store(id='selected-trait', data=selected_trait)
     ], style={'width': '100%', 'margin': 'auto', 'padding': '20px', 'min-width': '1200px', 'font-family': 'Arial, sans-serif', 'color': '#333', 'background-color': '#ffffff'})
 
-
+    # Define the callbacks
     @app.callback(
         [Output('trait-dropdown', 'options'),
          Output('trait-dropdown', 'value')],
@@ -291,6 +431,7 @@ def make_dashboard(debug=True):
          Input('selected-trait', 'data')]
     )
     def update_trait_dropdown(selected_microbe, selected_trait):
+        # Update the trait dropdown based on the selected microbe
         if debug: print(f"Updating trait dropdown for microbe: {selected_microbe}")
         if selected_microbe == 'All':
             return [{'label': trait, 'value': trait} for trait in traits], selected_trait
@@ -306,6 +447,7 @@ def make_dashboard(debug=True):
         [Input('trait-dropdown', 'value')]
     )
     def update_charts(selected_trait):
+        # Update the charts based on the selected trait
         if debug: print(f"Updating charts for trait: {selected_trait}")
         groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df, debug=debug)
         sankey = create_sankey_diagram(selected_trait, data_dir, color_scale, debug=debug)
@@ -313,7 +455,8 @@ def make_dashboard(debug=True):
         grid = grid_handler(grid, df, selected_trait, color_scale, debug=debug)
         return sankey, stripplot, grid
 
-    app.run_server(debug=debug, port=port)
+    # Run the app
+    #app.run_server(debug=debug, port=port)
     
 if __name__ == "__main__":
-    make_dashboard(debug=True)
+    make_dashboard(debug=True, port=8050)

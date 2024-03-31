@@ -6,6 +6,14 @@ from sklearn.tree import DecisionTreeClassifier, export_text
 from sklearn.model_selection import train_test_split
 
 def make_data(debug=True):
+    """Generate synthetic data for the visualization.
+
+    Args:
+        debug (bool): Whether to print debug statements.
+
+    Returns:
+        None
+    """
     print("Generating data...")
     # Load environment variables
     dotenv.load_dotenv()
@@ -53,7 +61,7 @@ def make_data(debug=True):
     trait_scores_df = original_trait_scores_df.copy()
     microbe_abundances_df = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
 
-    # Transform trait scores to categorical: low (-1), medium (0), high (1)
+    # Transform trait scores to categorical: low (-1), medium (0), high (1) -- this is arbitrary for synthetic process
     def categorize_score(score, low_threshold, high_threshold):
         if score <= low_threshold:
             return -1  # Low
@@ -62,6 +70,7 @@ def make_data(debug=True):
         else:
             return 0   # Medium
 
+    # Categorize trait scores
     for trait in trait_scores_df.columns:
         low_threshold = trait_scores_df[trait].quantile(0.33)
         high_threshold = trait_scores_df[trait].quantile(0.66)
@@ -77,6 +86,7 @@ def make_data(debug=True):
         # Splitting the dataset (optional for this operation)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
+        # Train the model
         clf = DecisionTreeClassifier(random_state=42, min_samples_leaf=5, max_depth=10)
         clf.fit(X_train, y_train)
 
@@ -130,6 +140,7 @@ def make_data(debug=True):
         # Add the feature path to the results DataFrame
         results_df['Feature Path'] = feature_paths_list
 
+        # Save the results to a CSV file
         results_df.to_csv(os.path.join(data_dir, trait, "mice.csv"), index=False)
         if debug: print(f"Results saved to {os.path.join(data_dir, trait, 'mice.csv')}.")
 
@@ -142,6 +153,7 @@ def make_data(debug=True):
 
         if debug: print(f"Simple human-readable rules saved to {os.path.join(data_dir, trait, 'rules.txt')}.")
 
+        # Parse rules to a DataFrame
         def parse_rules(trait, data_dir, clf, X):
             node_samples = clf.tree_.n_node_samples
             feature_indices = clf.tree_.feature
