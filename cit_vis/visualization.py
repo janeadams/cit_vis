@@ -18,6 +18,8 @@ def load_data():
     microbe_df = pd.read_csv(os.path.join(data_dir, "microbe_abundances.csv"), index_col=0)
     microbes = microbe_df.columns
     df = pd.concat([trait_df, microbe_df], axis=1)
+    df.reset_index(inplace=True)
+    df.rename(columns={'index': 'Mouse ID'}, inplace=True)
     return df, traits, microbes, data_dir
 
 def make_microbes_dropdown_options(microbes):
@@ -34,7 +36,8 @@ def load_trait_specific_data(trait, data_dir, df):
     color_scale = create_color_scale(df[trait])
     grid = pd.read_pickle(os.path.join(data_dir, trait, "grid.pkl"))
     mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"), index_col=0).filter(["Group ID"], axis=1)
-    group_ids = [mice.loc[mouse_id, 'Group ID'] for mouse_id in df.index]
+    group_ids = [mice.loc[mouse_id, 'Group ID'] for mouse_id in df['Mouse ID']]
+    df['color'] = [get_color(value, color_scale) for value in df[trait]]
     return groups, grid, color_scale, group_ids
 
 def create_color_scale(vector):
@@ -78,12 +81,11 @@ def create_sankey_diagram(groups, color_scale):
 def create_stripplot(df, trait, color_scale):
     df.sort_values(trait, inplace=True)
     # Assign a color to each group
-    df['color'] = [get_color(t, color_scale) for t in df[trait]]
-    color_lookup = dict(zip(df['Group ID'], df['color']))
-    fig = px.strip(df, x='Group ID', y=trait, color='Group ID', color_discrete_map=color_lookup)
+    color_lookup = dict(zip(df['Mouse ID'], df['color']))
+    fig = px.strip(df, x='Group ID', y=trait, color='Mouse ID', color_discrete_map=color_lookup)
     fig.update_layout(template='plotly_white', showlegend=False)
     # Add a dark gray stroke to the strip plot points:
-    fig.update_traces(marker=dict(size=8, line=dict(width=2, color='DarkSlateGray')))
+    fig.update_traces(marker=dict(size=10, line=dict(width=2, color='DarkSlateGray')))
     # On hover, show the mouse ID and the trait score
     fig.update_traces(hovertemplate='Mouse ID: %{x}<br>Trait: %{y}')
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
@@ -110,19 +112,21 @@ def create_arrow_plot():
     )
     return fig
 
-def create_grid_plot(feature, mice, df):
+def create_grid_plot(feature, mice, df, trait, color_scale):
     fig = go.Figure(
         go.Violin(x=df[feature], marker_color='lightgrey', showlegend=False, hoverinfo='skip',
                   points=False))
-    subset = df.loc[mice]
-    subset.reset_index(inplace=True)
-    subset.rename(columns={'index': 'Mouse ID'}, inplace=True)
-    subset['jitter'] = [0.01 + np.random.normal(0, 0.01) for _ in range(len(subset[feature]))]
-    fig.add_trace(
-        px.strip(subset, x=feature, hover_name="Mouse ID",
-                 hover_data={'Group ID':False, 'Mouse ID': False, feature: ':.2f', 'jitter': False},
-                 color='Group ID', color_discrete_map={group: color for group, color in zip(subset['Group ID'], subset['color'])}, y='jitter').data[0])
+    subset = df[df['Mouse ID'].isin(mice)].copy()
+    subset['jitter'] = [0.01 + np.random.normal(0, 0.05) for _ in range(len(subset[feature]))]
+    print(subset.filter(['Group ID', 'Mouse ID', 'color']))
+    for i, row in subset.iterrows():
+        fig.add_trace(
+            px.strip([row], x=feature, hover_name="Mouse ID",
+                    hover_data={'Group ID':False, 'Mouse ID': False, feature: ':.2f', 'jitter': False},
+                    color='Mouse ID', color_discrete_map={row['Mouse ID']: row['color']},
+                    y='jitter').data[0])
     fig.update_traces(marker=dict(size=10, line=dict(width=2, color='DarkSlateGray')))
+    fig.update_traces(offsetgroup=0)
     # Add a vertical line to show the mean value
     fig.add_vline(x=df[feature].mean(), line_dash="dash", line_color="#999")
     fig.update_layout(template='plotly_white', width=200, height=100, showlegend=False)
@@ -132,7 +136,7 @@ def create_grid_plot(feature, mice, df):
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     return fig
 
-def grid_handler(grid, df):
+def grid_handler(grid, df, trait, color_scale):
     grid_dict = grid.to_dict(orient='index')
     plot_grid = []
 
@@ -179,7 +183,7 @@ def grid_handler(grid, df):
                     )], style=content_style))
             elif celldata['Type'] == 'Plot':
                 row_items.append(html.Div([dcc.Graph(
-                    figure=create_grid_plot(celldata['Feature'], celldata['Mouse IDs'], df),
+                    figure=create_grid_plot(celldata['Feature'], celldata['Mouse IDs'], df, trait, color_scale),
                     config={'displayModeBar': False}
                     )], style=content_style))
             else:
@@ -247,7 +251,7 @@ def make_dashboard():
                     style=overview_cell_style)
         ], style=row_style),
         
-        html.Div(id='grid-container', children=grid_handler(grid, df), style=row_style),
+        html.Div(id='grid-container', children=grid_handler(grid, df, selected_trait, color_scale), style=row_style),
         dcc.Store(id='selected-trait', data=selected_trait)
     ], style={'width': '100%', 'margin': 'auto', 'padding': '20px', 'min-width': '1200px', 'font-family': 'Arial, sans-serif', 'color': '#333', 'background-color': '#ffffff'})
 
@@ -276,7 +280,7 @@ def make_dashboard():
         groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df)
         sankey = create_sankey_diagram(groups, color_scale)
         stripplot = create_stripplot(df, selected_trait, color_scale)
-        grid = grid_handler(grid, df)
+        grid = grid_handler(grid, df, selected_trait, color_scale)
         return sankey, stripplot, grid
 
     app.run_server(debug=True)
