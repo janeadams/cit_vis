@@ -8,7 +8,7 @@ from dash import Dash, html, dcc
 from dash.dependencies import Input, Output
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from cit_vis.parse import aggregate_by_group, get_grid_structure, get_edgelist
+from cit_vis.parse import get_edgelist, find_relevant
 
 def load_data():
     dotenv.load_dotenv()
@@ -59,26 +59,31 @@ def get_color(value, color_scale):
 def create_sankey_diagram(trait, data_dir, color_scale):
     sankey_df = get_edgelist(trait, data_dir)
     labels = list(set(sankey_df['source'].values) | set(sankey_df['target'].values))
-    colors = [get_color(value, color_scale) for value in sankey_df['mean_trait']]
+    # Look up the color for each node in the labels group:
+    colors = [get_color(sankey_df[sankey_df['target'] == label]['mean_trait'].mean(), color_scale) for label in labels]
     fig = go.Figure(data=[go.Sankey(
         node=dict(
             pad=15,
             thickness=20,
             line=dict(color="black", width=0.5),
             label=labels,
-            color=colors
+            color=colors,
+            hovertemplate='%{label} has %{value:.0f} total mice',
         ),
         link=dict(
             source=[labels.index(x) for x in sankey_df['source']],
             target=[labels.index(x) for x in sankey_df['target']],
-            value=sankey_df['value']
+            value=sankey_df['value'],
+            hovertemplate='%{value:.0f} mice',
         )
     )])
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
 def create_stripplot(df, trait, color_scale):
-    df.sort_values(trait, inplace=True)
+    # Order based on mean trait value for each Group ID:
+    order = df.groupby('Group ID')[trait].mean().sort_values().index
+    df['Group ID'] = pd.Categorical(df['Group ID'], categories=order, ordered=True)
     # Assign a color to each group
     color_lookup = dict(zip(df['Mouse ID'], df['color']))
     fig = px.strip(df, x='Group ID', y=trait, color='Mouse ID', color_discrete_map=color_lookup)
@@ -86,7 +91,7 @@ def create_stripplot(df, trait, color_scale):
     # Add a dark gray stroke to the strip plot points:
     fig.update_traces(marker=dict(size=10, line=dict(width=2, color='DarkSlateGray')))
     # On hover, show the mouse ID and the trait score
-    fig.update_traces(hovertemplate='Mouse ID: %{x}<br>Trait: %{y}')
+    fig.update_traces(hovertemplate=trait+': %{y:.2f}')
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
     return fig
 
@@ -227,6 +232,7 @@ def make_dashboard():
     row_style = {
         'display': 'flex',
         'width': '100%',
+        'margin': 'auto',
         'justifyContent': 'space-between',
         'alignItems': 'center',
         'flexWrap': 'wrap',  # Allow items to wrap
@@ -273,7 +279,7 @@ def make_dashboard():
     def update_trait_dropdown(selected_microbe, selected_trait):
         if selected_microbe == 'All':
             return [{'label': trait, 'value': trait} for trait in traits], selected_trait
-        relevant_traits = traits#get_relevant_traits(selected_microbe)
+        relevant_traits = find_relevant(selected_microbe, data_dir)
         if selected_trait not in relevant_traits:
             selected_trait = relevant_traits[0]
         return [{'label': trait, 'value': trait} for trait in relevant_traits], selected_trait
