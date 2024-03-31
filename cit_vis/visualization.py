@@ -456,7 +456,7 @@ def make_dashboard(debug=True, port=8050):
         return sankey, stripplot, grid
 
     # Run the app
-    #app.run_server(debug=debug, port=port)
+    app.run_server(debug=debug, port=port)
     
 if __name__ == "__main__":
     make_dashboard(debug=True, port=8050)
