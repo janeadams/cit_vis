@@ -56,8 +56,8 @@ def get_color(value, color_scale):
     # Convert RGBA to hexadecimal
     return mcolors.to_hex(rgba_color)
 
-def create_sankey_diagram(groups, color_scale):
-    sankey_df = get_edgelist(groups)
+def create_sankey_diagram(trait, data_dir, color_scale):
+    sankey_df = get_edgelist(trait, data_dir)
     labels = list(set(sankey_df['source'].values) | set(sankey_df['target'].values))
     colors = [get_color(value, color_scale) for value in sankey_df['mean_trait']]
     fig = go.Figure(data=[go.Sankey(
@@ -71,8 +71,7 @@ def create_sankey_diagram(groups, color_scale):
         link=dict(
             source=[labels.index(x) for x in sankey_df['source']],
             target=[labels.index(x) for x in sankey_df['target']],
-            value=sankey_df['value'],
-            #label=sankey_df['edge_label']
+            value=sankey_df['value']
         )
     )])
     fig.update_layout(margin=dict(l=20, r=20, t=20, b=20), height=200)
@@ -254,7 +253,7 @@ def make_dashboard():
         ], style=row_style),
 
         html.Div([
-            html.Div([dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(groups, color_scale), config={'displayModeBar': False})],
+            html.Div([dcc.Graph(id='sankey-diagram', figure=create_sankey_diagram(selected_trait, data_dir, color_scale), config={'displayModeBar': False})],
                     style=overview_cell_style),
             html.Div([dcc.Graph(id='stripplot', figure=create_stripplot(df, selected_trait, color_scale), config={'displayModeBar': False})],
                     style=overview_cell_style)
@@ -287,7 +286,7 @@ def make_dashboard():
     )
     def update_charts(selected_trait):
         groups, grid, color_scale, df['Group ID'] = load_trait_specific_data(selected_trait, data_dir, df)
-        sankey = create_sankey_diagram(groups, color_scale)
+        sankey = create_sankey_diagram(selected_trait, data_dir, color_scale)
         stripplot = create_stripplot(df, selected_trait, color_scale)
         grid = grid_handler(grid, df, selected_trait, color_scale)
         return sankey, stripplot, grid

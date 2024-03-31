@@ -18,22 +18,6 @@ def aggregate_by_group(mice, trait, data_dir):
     groups.to_pickle(os.path.join(data_dir, trait, "groups.pkl"))
     return groups
 
-def parse_rules(trait, data_dir):
-    tree_rules = open(os.path.join(data_dir, trait, "rules.txt")).read()
-    rules_df = pd.DataFrame(columns=['Depth', 'Microbe', 'Split', 'Value'])
-    last_at_depth = {0: 'Root'}
-    for i, line in enumerate(tree_rules.split("\n")):
-        depth = line.count('|')
-        elements = line.split( )[depth:]
-        if len(elements) == 3:
-            if elements[0] != 'class:':
-                microbe, split, value = elements
-                rules_df.loc[i] = [depth, microbe, split, value]
-        last_at_depth[depth] = microbe
-    os.makedirs(os.path.join(data_dir, trait), exist_ok=True)
-    rules_df.to_csv(os.path.join(data_dir, trait, "rules.csv"), index=False)
-    return rules_df
-
 def get_grid_structure(groups, rules):
     groups_dict = groups.copy().to_dict(orient="index")
     cols = []
@@ -80,17 +64,30 @@ def get_grid_structure(groups, rules):
     grid = pd.DataFrame(cols, columns=feature_names, index=group_names).T
     return grid
         
-def get_edgelist(groups):
-    edgelist = []
-    for i, group in groups.iterrows():
-        for i in range(len(group["Feature Path"])-1):
-            source = group["Feature Path"][i]
-            target = group["Feature Path"][i+1]
-            value = len(group.index)
-            mean_trait = group["Mean Trait Value"]
-            edgelist.append([source, target, value, mean_trait])
-    edgeDF = pd.DataFrame(edgelist, columns=["source", "target", "value", "mean_trait"])
-    return edgeDF
+def get_edgelist(trait, data_dir):
+    rules = pd.read_csv(os.path.join(data_dir, trait, "rules.csv")).to_dict('records')
+    mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"))
+    mice["Feature Path"] = mice["Feature Path"].apply(lambda x: x.split(" -> "))
+    extended_paths = []
+    for i, path in enumerate(mice["Feature Path"]):
+        path.append(mice["Group ID"][i])
+        if path not in extended_paths:
+            extended_paths.append(path)
+
+    # iterate over all the paths to get the edges
+    edges = []
+    for path in extended_paths:
+        for i in range(len(path)-1):
+            group = path[-1]
+            edges.append({
+                "source": path[i],
+                "target": path[i+1],
+                "group": group,
+                "value": mice[mice["Group ID"]==group].shape[0],
+                "mean_trait": mice[mice["Group ID"]==group][trait].mean(),
+            })
+    edgelist = pd.DataFrame(edges)
+    return edgelist
 
 def parse_data():
     dotenv.load_dotenv()
@@ -99,7 +96,7 @@ def parse_data():
     for trait in folders:
         mice = pd.read_csv(os.path.join(data_dir, trait, "mice.csv"))
         groups = aggregate_by_group(mice, trait, data_dir)
-        rules = parse_rules(trait, data_dir)
+        rules = pd.read_csv(os.path.join(data_dir, trait, "rules.csv"))
         grid = get_grid_structure(groups, rules)
         grid.to_pickle(os.path.join(data_dir, trait, "grid.pkl"))
 

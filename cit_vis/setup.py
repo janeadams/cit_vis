@@ -132,5 +132,37 @@ def make_data():
         with open(os.path.join(data_dir, trait, "rules.txt"), "w") as text_file:
             text_file.write(tree_rules)
 
+        def parse_rules(trait, data_dir, clf, X):
+            node_samples = clf.tree_.n_node_samples
+            feature_indices = clf.tree_.feature
+
+            # Assuming you have a list of feature names
+            feature_names = X.columns
+
+            node_counts = {}
+            for node_index, feature_index in enumerate(feature_indices):
+                # Check if the feature_index is not -2, indicating it's not a leaf node
+                if feature_index != -2:
+                    feature_name = feature_names[feature_index]
+                    node_counts[feature_name] = node_samples[node_index]
+
+            rules_df = pd.DataFrame(columns=['Depth', 'Microbe', 'Split', 'Value', 'Samples'])
+            tree_rules = export_text(clf, feature_names=list(X.columns))
+
+            for i, line in enumerate(tree_rules.split("\n")):
+                depth = line.count('|')
+                elements = line.split()[depth:]
+                if len(elements) == 3:
+                    if elements[0] != 'class:':
+                        microbe, split, value = elements
+                        samples_count = node_counts[microbe]
+                        rules_df.loc[i] = [depth, microbe, split, value, samples_count]
+
+            os.makedirs(os.path.join(data_dir, trait), exist_ok=True)
+            rules_df.to_csv(os.path.join(data_dir, trait, "rules.csv"), index=False)
+            return rules_df
+        
+        rules_df = parse_rules(trait, data_dir, clf, X)
+
 if __name__ == "__main__":
     make_data()
