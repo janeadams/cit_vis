@@ -50,7 +50,7 @@ python3 main.py
 
 or in a Jupyter Notebook by opening `main.ipynb`.
 
-The visualization application should launch by default at `localhost:8050`, which means you can open any browser window and navigate to `http://127.0.0.1:8050/` to view.
+The visualization application should launch by default at `localhost:8050`, which means you can open any browser window and navigate to [http://127.0.0.1:8050](http://127.0.0.1:8050) to view.
 
 If you get an error that the port is already in use (this can happen if you're launching the app multiple times, or trying to run the app from a notebook and the CLI at the same time), you can `lsof -i:8050` to find the PID and kill it if you need. If something besides this app is running at `:8050` already, change the default port in the `.env`.
 
