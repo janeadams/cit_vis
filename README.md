@@ -62,6 +62,7 @@ The system is designed to output all the data structures necessary for the rende
 
 Some known things we would like to improve upon:
 
+- Adjust strip plot jitter: this is a trace patch omission in the Plotly px.strip config for accessing the Box plot constructor. We have filed a pull request to make this work.
 - Adding unit tests
 - Keeping ordering of groups consistent across all three charts; these get shuffled at some point
 - Algorithmic optimization (and a loading screen for when changes are slow)
@@ -70,4 +71,4 @@ Some known things we would like to improve upon:
 
 ## Contribution and Collaboration
 
-This is a research prototype, not a system, so it is not yet robust to general deployment. If you have trouble, please file an issue on GitHub. If you'd like to chat about how to apply this to your own data on a real system, e.g. GCP or your own HPC cluster, by extending the existing functionality, please email Jane: janelydiaadams@gmail.com.
+This is a research prototype, not a system, so it is not yet robust to general deployment. If you have trouble, please file an issue on GitHub. If you'd like to chat about how to apply this to your own data on a real system, e.g. GCP or your own HPC cluster, by extending the existing functionality, please email XXX

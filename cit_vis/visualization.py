@@ -188,6 +188,12 @@ def create_stripplot(df, trait, color_scale, debug=True):
 
     # Assign a color to each group
     color_lookup = dict(zip(df['Mouse ID'], df['color']))
+
+    # This attempt to modulate the jitter doesn't work because of the px.strip specification
+    # which creates an array of go.Box elements. We have filed a Github issue to address this.
+    #data = px.strip(df, x='Group ID', y=trait, color='Mouse ID', color_discrete_map=color_lookup).data
+    #for datum in data: datum.update(jitter=0.2)
+
     fig = px.strip(df, x='Group ID', y=trait, color='Mouse ID', color_discrete_map=color_lookup)
     fig.update_layout(template='plotly_white', showlegend=False)
 
@@ -387,7 +393,7 @@ def make_dashboard(debug=True, port=8050):
         'display': 'flex',
         'width': '100%',
         'margin': 'auto',
-        'justifyContent': 'space-between',
+        'justifyContent': 'left',
         'alignItems': 'center',
         'flexWrap': 'wrap',  # Allow items to wrap
         'marginBottom': '20px'  # Add some space between rows for clarity
@@ -395,11 +401,13 @@ def make_dashboard(debug=True, port=8050):
     dropdown_cell_style = {
         'padding': '10px',  # Ensure padding has units
         'flexBasis': 'calc(50% - 20px)',  # Calculate width considering padding/margin
-        'boxSizing': 'border-box'  # Include padding in the element's total width
+        'boxSizing': 'border-box',  # Include padding in the element's total width
+        'maxWidth': '500px'
     }
     overview_cell_style = dropdown_cell_style.copy()
     overview_cell_style.update({
-        'height': '200px'
+        'height': '200px',
+        'maxWidth': '500px'
     })
 
     # Define the layout
@@ -421,7 +429,7 @@ def make_dashboard(debug=True, port=8050):
         
         html.Div(id='grid-container', children=grid_handler(grid, df, selected_trait, color_scale, debug=debug), style=row_style),
         dcc.Store(id='selected-trait', data=selected_trait)
-    ], style={'width': '100%', 'margin': 'auto', 'padding': '20px', 'min-width': '1200px', 'font-family': 'Arial, sans-serif', 'color': '#333', 'background-color': '#ffffff'})
+    ], style={'width': '100%', 'margin': 'auto', 'padding': '80px', 'min-width': '1200px', 'font-family': 'Arial, sans-serif', 'color': '#333', 'background-color': '#ffffff'})
 
     # Define the callbacks
     @app.callback(
