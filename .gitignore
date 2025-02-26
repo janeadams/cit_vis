@@ -10,3 +10,5 @@
 .html
 data/
 */__pycache__/
+real-data/*
+src/*

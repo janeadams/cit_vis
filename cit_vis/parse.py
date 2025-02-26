@@ -78,6 +78,7 @@ def get_grid_structure(groups, rules, debug=True):
 
         # Create the row for the group
         for feature in feature_names:
+            print(f'Finding the row for {feature}...')
             split = rules[rules["Microbe"]==feature]["Split"].values[0]
             value = rules[rules["Microbe"]==feature]["Value"].values[0]
             if feature in data["Feature Path"]:

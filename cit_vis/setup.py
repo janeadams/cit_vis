@@ -14,12 +14,19 @@ def make_data(debug=True):
     Returns:
         None
     """
-    print("Generating data...")
     # Load environment variables
     dotenv.load_dotenv()
 
     # Ensure the data directory exists
     data_dir = os.getenv("DATA_DIR")
+
+    if os.path.isdir(data_dir):
+        # Don't generate synthetic data
+        print(f'Found existing data at {data_dir}')
+        return
+    else:
+        print(f"No data folder found at {data_dir}. Generating data...")
+
     os.makedirs(data_dir, exist_ok=True)
 
     # Initialize parameters
