@@ -11,26 +11,26 @@ This dashboard is for visualizing the results of XAI trees on wide data. It was 
    cd XXX
    ```
 
-2. Install virtual env, then create and activate a virtual environment (optional but recommended):
+2. If you don't already have `uv` installed, install it with one of the following commands:
 
-    ```
-    pip install virtualenv
-    python3 -m venv .venv
-    source .venv/bin/activate
-    ```
+On MacOS with Homebrew:
+```bash
+brew install uv
+```
 
-    If you are on another operating system, refer to this table for the correct activation command:
+On Windows:
+```bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
 
-    | Platform |    Shell   | Command to activate virtual environment |
-    |:--------:|:----------:|:---------------------------------------:|
-    | POSIX    | bash/zsh   | $ source .venv/bin/activate            |
-    |          | fish       | $ source .venv/bin/activate.fish       |
-    |          | csh/tcsh   | $ source .venv/bin/activate.csh        |
-    |          | PowerShell | $ .venv/bin/Activate.ps1               |
-    | Windows  | cmd.exe    | C:\> .venv\Scripts\activate.bat        |
-    |          | PowerShell | PS C:\> .venv\Scripts\Activate.ps1     |
+On Linux:
+```bash
+wget -qO- https://astral.sh/uv/install.sh | sh
+```
 
-3. Install requirements with `pip3 install -r requirements.txt` (or just `pip install -r requirements.txt` if pip is aliased to pip3). There is also `setup-requirements.txt` included, but everything there is also in the main requirements file, so you shouldn't need to install both.
+or choose one of the other uv install methods detailed [here](https://docs.astral.sh/uv/getting-started/installation/).
+
+3. Run `uv sync` to sync dependencies for the project. This process replaces using anaconda or pip environments. You can read more about uv in the "Dependencies" section below.
 
 ## Demo
 
@@ -57,6 +57,16 @@ If you get an error that the port is already in use (this can happen if you're l
 You can opt to select a microbe of interest from the dropdown on the left, which will filter down the dropdown on the right to relevant traits; this is optional, and if left unselected, all traits will be available. Select a trait from the dropdown to render the charts for that trait.
 
 The system is designed to output all the data structures necessary for the rendering, therefore making the transformations accessible for downstream tasks; for our collaborators' uses, saving these out to the data directory structure is a sufficient solution, but having a "download data" button on each chart would be a nice addition in the future for GUI-only users.
+
+### Dependencies
+> [!WARNING]  
+> We are using uv. DO NOT use `pip` directly or create a requirements.txt file. For example, instead of `pip install tqdm`, you should use `uv add tqdm`, or prepend all pip commands, e.g. `uv pip install tqdm`.
+
+This project uses `uv` for dependency management. [Read more about `uv` here.](https://docs.astral.sh/uv/guides/projects/#managing-dependencies) To set up your environment on first clone, run `uv sync`. Learn more about uv project structure [here](https://docs.astral.sh/uv/guides/projects/#project-structure).
+
+To activate the virtual environment after it is created, you can call `source .venv/bin/activate` on Mac/Linux or `.venv\Scripts\activate` on Windows. You might want to just add an alias to your bash config, like `vim .zshrc` > `alias activate="source .venv/bin/activate"` so you can just type `activate` to activate.
+
+To use the uv-created .venv in a Jupyter Notebook in VSCode, choose "Select kernel..." > "Python Environments" > "Create Python Environment" > ".venv" > "Use Existing".
 
 ## Future Work
 
